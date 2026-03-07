@@ -1,0 +1,7 @@
+{
+    "last_id": 0,
+    //Stores last internal task ID used
+    //increases each new task by 1
+    "tasks": []
+    //lists all tasks 
+}
