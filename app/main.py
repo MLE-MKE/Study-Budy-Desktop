@@ -7,17 +7,15 @@ print("Task file is:")
 print(TASK_FILE)
 print()
 
-print(handle_command(user, "!addtask Edit video"))
-print(handle_command(user, "!addtask Clean desk"))
-print(handle_command(user, "!addtask Plan stream"))
-
+print(handle_command(user, "!addtask Edit video | Clean desk | Plan stream"))
 print()
+
 print("Current tasks:")
 print(handle_command(user, "!tasklist"))
-
 print()
-print(handle_command(user, "!done 2"))
 
+print(handle_command(user, "!clear"))
 print()
-print("Tasks after completion:")
-print(handle_command(user, "!tasklist"))
+
+print("Tasks after clear:")
+print(handle_command(user, "!tasklist"))        

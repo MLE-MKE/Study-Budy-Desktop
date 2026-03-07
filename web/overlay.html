@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Study Budy Tasks</title>
+
+<style>
+
+body {
+    background: rgba(0,0,0,0);
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+.container {
+    background: rgba(0,0,0,0.6);
+    padding: 20px;
+    border-radius: 12px;
+    width: 300px;
+}
+
+h2 {
+    margin-top: 0;
+}
+
+.task {
+    margin: 6px 0;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+<h2>Tasks Overlay Connected</h2>
+<div id="tasks"></div>
+</div>
+
+<script>
+
+const SERVER = "http://192.168.1.16:5000/tasks";
+
+async function loadTasks() {
+
+    const response = await fetch(SERVER);
+    const data = await response.json();
+
+    const taskContainer = document.getElementById("tasks");
+    taskContainer.innerHTML = "";
+
+    for (const user in data) {
+
+        const header = document.createElement("h3");
+        header.innerText = user;
+        taskContainer.appendChild(header);
+
+        data[user].forEach((task, index) => {
+
+            const div = document.createElement("div");
+            div.className = "task";
+            div.innerText = (index + 1) + ". " + task;
+
+            taskContainer.appendChild(div);
+
+        });
+
+    }
+
+}
+
+loadTasks();
+
+setInterval(loadTasks, 3000);
+
+</script>
+
+</body>
+</html>

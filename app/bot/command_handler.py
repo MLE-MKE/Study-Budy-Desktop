@@ -1,6 +1,5 @@
-# Import the task functions we already built in task_manager
-# These handle reading/writing the JSON task file
-from app.storage.task_manager import add_task, get_tasks, complete_task
+# Import the task functions from task_manager
+from app.storage.task_manager import add_task, get_tasks, complete_task, clear_tasks
 
 
 # -----------------------------------------------------------
@@ -33,10 +32,10 @@ def format_task_list(user):
 # -----------------------------------------------------------
 def handle_command(user, message):
 
-    # Remove any accidental spaces before/after message
+    # Remove extra spaces before and after the message
     message = message.strip()
 
-    # If the message doesn't start with "!" then ignore it
+    # Ignore anything that is not a command
     if not message.startswith("!"):
         return None
 
@@ -47,46 +46,45 @@ def handle_command(user, message):
     # -------------------------------------------------------
     if message.startswith("!addtask "):
 
-        # Remove the command portion from the message
+        # Remove the command text and keep only the task text
         task_text = message[len("!addtask "):].strip()
 
-        # If the user typed !addtask but didn't include a task
+        # Stop if the user did not actually include a task
         if not task_text:
             return "You need to provide a task."
 
-        # Split the message into multiple tasks using "|"
+        # Split multiple tasks using the | symbol
         raw_tasks = task_text.split("|")
 
-        # This will store the cleaned tasks
+        # Store cleaned tasks here
         cleaned_tasks = []
 
-        # Loop through each piece and clean whitespace
+        # Remove extra spaces from each task
         for task in raw_tasks:
             cleaned_task = task.strip()
 
-            # Only keep tasks that actually contain text
+            # Only keep non-empty tasks
             if cleaned_task:
                 cleaned_tasks.append(cleaned_task)
 
-        # If nothing valid was provided
+        # If no valid tasks remain, return an error message
         if not cleaned_tasks:
             return "You need to provide at least one valid task."
 
-        # Add each task to the user's task list
+        # Add each cleaned task to the user's list
         for task in cleaned_tasks:
             add_task(user, task)
 
-        # If only one task was added, return a specific message
+        # Return a different response for one task vs many tasks
         if len(cleaned_tasks) == 1:
             return f"Task added for {user}: {cleaned_tasks[0]}"
 
-        # If multiple tasks were added
         return f"Added {len(cleaned_tasks)} tasks for {user}."
 
 
     # -------------------------------------------------------
     # COMMAND: !tasklist
-    # Shows the user's current tasks
+    # PURPOSE: Show the user's current tasks
     # -------------------------------------------------------
     if message == "!tasklist":
         return format_task_list(user)
@@ -95,34 +93,50 @@ def handle_command(user, message):
     # -------------------------------------------------------
     # COMMAND: !done
     # Example: !done 2
-    # Marks a numbered task as complete
+    # PURPOSE: Mark one numbered task as complete
     # -------------------------------------------------------
     if message.startswith("!done "):
 
-        # Extract the number after !done
+        # Pull the number after !done
         number_text = message[len("!done "):].strip()
 
-        # If the user didn't give a number
+        # Make sure the user entered a number
         if not number_text.isdigit():
             return "Use !done followed by a task number."
 
-        # Convert text to an integer
+        # Convert the number text into an integer
         task_number = int(number_text)
 
-        # Attempt to complete that task
+        # Try to remove that task
         completed = complete_task(user, task_number)
 
-        # If the task number doesn't exist
+        # If the task number was invalid
         if completed is None:
             return "That task number does not exist."
 
-        # Return confirmation message
+        # Return a success message
         return f"Completed task for {user}: {completed}"
 
+
+    # -------------------------------------------------------
+    # COMMAND: !clear
+    # PURPOSE: Remove all tasks for this user
+    # -------------------------------------------------------
+    if message == "!clear":
+
+        # Try to clear all tasks for the user
+        cleared = clear_tasks(user)
+
+        # If the user had no tasks stored
+        if not cleared:
+            return f"{user} has no tasks to clear."
+
+        # Success response
+        return f"Cleared all tasks for {user}."
 
 
     # -------------------------------------------------------
     # DEFAULT RESPONSE
-    # If the command wasn't recognized
+    # PURPOSE: Catch unknown commands
     # -------------------------------------------------------
     return "Unknown command."
