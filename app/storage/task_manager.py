@@ -65,6 +65,24 @@ def complete_task(user, task_number):
 
     return completed_task
 
+# ---- CLEAR ALL TASKS FOR A USER ----
+def clear_tasks(user):
+    # Load the full task dictionary from the JSON file
+    tasks = load_tasks()
+
+    # If the user does not exist, return False
+    if user not in tasks:
+        return False
+
+    # Remove the user's entire task list
+    del tasks[user]
+
+    # Save the updated task data back to the JSON file
+    save_tasks(tasks)
+
+    # Return True to show the clear worked
+    return True
+
 # ---- NO TASK FOUND CATCH ----
 def format_tasks(user):
     user_tasks = get_tasks(user)
