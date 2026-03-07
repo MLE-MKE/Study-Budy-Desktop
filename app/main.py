@@ -1,22 +1,23 @@
+from app.bot.command_handler import handle_command
 from app.storage.task_manager import TASK_FILE
 
-print("task file is:")
+user = "Emily"
+
+print("Task file is:")
 print(TASK_FILE)
+print()
 
+print(handle_command(user, "!addtask Edit video"))
+print(handle_command(user, "!addtask Clean desk"))
+print(handle_command(user, "!addtask Plan stream"))
 
-from app.storage.task_manager import add_task, get_tasks, complete_task
+print()
+print("Current tasks:")
+print(handle_command(user, "!tasklist"))
 
-print("Adding tasks...")
-add_task("Emily", "Edit video")
-add_task("Emily", "Clean desk")
-add_task("Emily", "Plan stream")
+print()
+print(handle_command(user, "!done 2"))
 
-print("Emily's tasks:")
-print(get_tasks("Emily"))
-
-print("Completing task 2...")
-completed = complete_task("Emily", 2)
-print("Completed:", completed)
-
-print("Emily's tasks now:")
-print(get_tasks("Emily"))
+print()
+print("Tasks after completion:")
+print(handle_command(user, "!tasklist"))

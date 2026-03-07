@@ -2,20 +2,21 @@ import os
 import json
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-#Where da fu is the project root
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-#path to data folder
-DATA_DIR = os.path.join(BASE_DIR, "data")
+# go from app/storage → app → project root
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
 
-#path to task file
-TASK_FILE = os.path.join(DATA_DIR, "task.json")
+# path to data folder
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 
-#test to make sure it exists
+# path to tasks file
+TASK_FILE = os.path.join(DATA_DIR, "tasks.json")
+
+# ensure data folder exists
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
-    
-# Ensure tasks.json exists
+
+# ensure tasks.json exists
 if not os.path.exists(TASK_FILE):
     with open(TASK_FILE, "w") as f:
         json.dump({}, f)
@@ -63,3 +64,16 @@ def complete_task(user, task_number):
     save_tasks(tasks)
 
     return completed_task
+
+# ---- NO TASK FOUND CATCH ----
+def format_tasks(user):
+    user_tasks = get_tasks(user)
+
+    if not user_tasks:
+        return "No tasks found."
+
+    lines = []
+    for i, task in enumerate(user_tasks, start=1):
+        lines.append(f"{i}. {task}")
+
+    return "\n".join(lines)
