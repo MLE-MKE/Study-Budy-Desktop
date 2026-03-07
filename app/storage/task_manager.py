@@ -30,3 +30,36 @@ def load_tasks():
 def save_tasks(tasks):
     with open(TASK_FILE, "w") as f:
         json.dump(tasks, f, indent=4)
+
+# ----GET TASK----        
+def get_tasks(user):
+    tasks = load_tasks()
+    return tasks.get(user, [])
+
+# ----ADD TASK----
+def add_task(user, task):
+    tasks = load_tasks()
+
+    if user not in tasks:
+        tasks[user] = []
+
+    tasks[user].append(task)
+    save_tasks(tasks)
+
+    return tasks[user]
+
+# ---- COMPLETE TASK ----
+def complete_task(user, task_number):
+    tasks = load_tasks()
+
+    if user not in tasks:
+        return None
+
+    if task_number < 1 or task_number > len(tasks[user]):
+        return None
+
+    completed_task = tasks[user].pop(task_number - 1)
+
+    save_tasks(tasks)
+
+    return completed_task
