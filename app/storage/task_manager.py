@@ -1,6 +1,7 @@
 import os
 import json
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 #Where da fu is the project root
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -18,3 +19,14 @@ if not os.path.exists(DATA_DIR):
 if not os.path.exists(TASK_FILE):
     with open(TASK_FILE, "w") as f:
         json.dump({}, f)
+        
+# ----- LOAD TASK DEFINITION ----
+def load_tasks():
+    with open(TASK_FILE, "r") as f:
+        tasks = json.load(f)
+    return tasks 
+
+# ----SAVE TASK DEFINITION ----
+def save_tasks(tasks):
+    with open(TASK_FILE, "w") as f:
+        json.dump(tasks, f, indent=4)
