@@ -54,7 +54,7 @@ OVERLAY_HTML = """
 
 <body>
     <div class="box">
-        <h1>Study Budy Tasks</h1>
+        <h1>PEE PEE POO POO test confirmation</h1>
 
         <!-- Tasks will be inserted here dynamically -->
         <ul id="task-list"></ul>
