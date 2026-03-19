@@ -2,7 +2,7 @@
 from flask import Flask, jsonify, render_template_string
 
 # Import your task manager functions (these handle JSON storage)
-from task_manager import get_tasks, add_task, clear_tasks   
+from storage.task_manager import get_tasks, add_task, clear_tasks   
 
 # Create the Flask server
 app = Flask(__name__)
