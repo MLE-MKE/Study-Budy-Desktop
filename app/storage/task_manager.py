@@ -3,41 +3,53 @@ import json
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# go from app/storage → app → project root
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
+# Go from app folder to project root
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 
-# path to data folder
+# Path to data folder
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 
-# path to tasks file
+# Path to tasks file
 TASK_FILE = os.path.join(DATA_DIR, "tasks.json")
 
-# ensure data folder exists
+# Ensure data folder exists
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
-# ensure tasks.json exists
+# Ensure tasks.json exists
 if not os.path.exists(TASK_FILE):
-    with open(TASK_FILE, "w") as f:
-        json.dump({}, f)
-        
-# ----- LOAD TASK DEFINITION ----
-def load_tasks():
-    with open(TASK_FILE, "r") as f:
-        tasks = json.load(f)
-    return tasks 
+    with open(TASK_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, indent=4)
 
-# ----SAVE TASK DEFINITION ----
+
+# ---- LOAD TASKS ----
+def load_tasks():
+    try:
+        with open(TASK_FILE, "r", encoding="utf-8") as f:
+            tasks = json.load(f)
+
+        if not isinstance(tasks, dict):
+            return {}
+
+        return tasks
+
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {}
+
+
+# ---- SAVE TASKS ----
 def save_tasks(tasks):
-    with open(TASK_FILE, "w") as f:
+    with open(TASK_FILE, "w", encoding="utf-8") as f:
         json.dump(tasks, f, indent=4)
 
-# ----GET TASK----        
+
+# ---- GET TASKS FOR ONE USER ----
 def get_tasks(user):
     tasks = load_tasks()
     return tasks.get(user, [])
 
-# ----ADD TASK----
+
+# ---- ADD TASK FOR ONE USER ----
 def add_task(user, task):
     tasks = load_tasks()
 
@@ -49,7 +61,8 @@ def add_task(user, task):
 
     return tasks[user]
 
-# ---- COMPLETE TASK ----
+
+# ---- COMPLETE TASK FOR ONE USER ----
 def complete_task(user, task_number):
     tasks = load_tasks()
 
@@ -60,30 +73,25 @@ def complete_task(user, task_number):
         return None
 
     completed_task = tasks[user].pop(task_number - 1)
-
     save_tasks(tasks)
 
     return completed_task
 
-# ---- CLEAR ALL TASKS FOR A USER ----
+
+# ---- CLEAR ALL TASKS FOR ONE USER ----
 def clear_tasks(user):
-    # Load the full task dictionary from the JSON file
     tasks = load_tasks()
 
-    # If the user does not exist, return False
     if user not in tasks:
         return False
 
-    # Remove the user's entire task list
     del tasks[user]
-
-    # Save the updated task data back to the JSON file
     save_tasks(tasks)
 
-    # Return True to show the clear worked
     return True
 
-# ---- NO TASK FOUND CATCH ----
+
+# ---- FORMAT TASKS FOR DISPLAY ----
 def format_tasks(user):
     user_tasks = get_tasks(user)
 
