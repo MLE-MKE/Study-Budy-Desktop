@@ -38,14 +38,14 @@ def overlay(username):
 # Adds a task for username and saves it to JSON
 # Example: /add/Do%20Homework
 @app.route("/add/<username>/<task>")
-def add_task_route(task):
+def add_task_route(username, task):
     updated_tasks = add_task(username, task)
     return jsonify({"success": True, "tasks": updated_tasks})
 
 
 # Clears all tasks for username
 @app.route("/clear/<username>")
-def clear_tasks_route():
+def clear_tasks_route(username):
     success = clear_tasks(username)
     return jsonify({"success": success, "tasks": get_tasks(username)})
 
