@@ -23,32 +23,27 @@ username = "stream"
 def home():
     return "Study Budy server is running."
 
-
-# Serves the overlay HTML to OBS/browser
-@app.route("/tasks/<username>")
-def tasks_route(username):
-    return jsonify({"tasks": get_tasks(username)})
-
-
-# Returns tasks for username from JSON file
+# Route to serve the overlay page for a specific user
 @app.route("/overlay/<username>")
 def overlay(username):
     return render_template("overlay.html", username=username)
 
-# Adds a task for username and saves it to JSON
-# Example: /add/Do%20Homework
+# Get Tasks Function
+@app.route("/tasks/<username>")
+def tasks_route(username):
+    return jsonify({"tasks": get_tasks(username)})
+
+# Add Task Function
 @app.route("/add/<username>/<task>")
 def add_task_route(username, task):
     updated_tasks = add_task(username, task)
     return jsonify({"success": True, "tasks": updated_tasks})
 
-
-# Clears all tasks for username
+#Clear Function
 @app.route("/clear/<username>")
 def clear_tasks_route(username):
     success = clear_tasks(username)
     return jsonify({"success": success, "tasks": get_tasks(username)})
-
 
 # -------------------------
 # START SERVER
