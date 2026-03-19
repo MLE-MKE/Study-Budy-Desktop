@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>PeePeePooPoo test</title>
+
+<style>
+
+body {
+    background: rgba(0,0,0,0);
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+.container {
+    background: rgba(0,0,0,0.6);
+    padding: 20px;
+    border-radius: 12px;
+    width: 300px;
+}
+
+h2 {
+    margin-top: 0;
+}
+
+.task {
+    margin: 6px 0;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+    <h2>{{ username }}'s Tasks</h2>
+    <div id="tasks"></div>
+</div>
+
+<script>
+const USERNAME = "{{ username }}";
+
+async function loadTasks() {
+    try {
+        const response = await fetch(`/tasks/${USERNAME}`);
+        const data = await response.json();
+
+        const taskContainer = document.getElementById("tasks");
+        taskContainer.innerHTML = "";
+
+        data.tasks.forEach((task, index) => {
+            const div = document.createElement("div");
+            div.className = "task";
+            div.innerText = (index + 1) + ". " + task;
+            taskContainer.appendChild(div);
+        });
+    } catch (error) {
+        console.error("Failed to load tasks:", error);
+    }
+}
+
+loadTasks();
+setInterval(loadTasks, 3000);
+</script>
+
+</body>
+</html>

@@ -9,7 +9,7 @@ app = Flask(__name__)
 
 # Default user (this is who the overlay will display for now)
 # Later this will be replaced with Twitch usernames
-DEFAULT_USER = "stream"
+username = "stream"
 
 
 
@@ -25,30 +25,29 @@ def home():
 
 
 # Serves the overlay HTML to OBS/browser
-@app.route("/overlay")
-def overlay():
-    return render_template("overlay.html")
+@app.route("/tasks/<username>")
+def tasks_route(username):
+    return jsonify({"tasks": get_tasks(username)})
 
 
-# Returns tasks for DEFAULT_USER from JSON file
-@app.route("/tasks")
-def tasks_route():
-    return jsonify({"tasks": get_tasks(DEFAULT_USER)})
+# Returns tasks for username from JSON file
+@app.route("/overlay/<username>")
+def overlay(username):
+    return render_template("overlay.html", username=username)
 
-
-# Adds a task for DEFAULT_USER and saves it to JSON
+# Adds a task for username and saves it to JSON
 # Example: /add/Do%20Homework
-@app.route("/add/<task>")
+@app.route("/add/<username>/<task>")
 def add_task_route(task):
-    updated_tasks = add_task(DEFAULT_USER, task)
+    updated_tasks = add_task(username, task)
     return jsonify({"success": True, "tasks": updated_tasks})
 
 
-# Clears all tasks for DEFAULT_USER
-@app.route("/clear")
+# Clears all tasks for username
+@app.route("/clear/<username>")
 def clear_tasks_route():
-    success = clear_tasks(DEFAULT_USER)
-    return jsonify({"success": success, "tasks": get_tasks(DEFAULT_USER)})
+    success = clear_tasks(username)
+    return jsonify({"success": success, "tasks": get_tasks(username)})
 
 
 # -------------------------
