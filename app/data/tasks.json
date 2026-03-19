@@ -1,1 +1,6 @@
-{}
+{
+    "stream": [
+        "TestTask2",
+        "TestTask1"
+    ]
+}
