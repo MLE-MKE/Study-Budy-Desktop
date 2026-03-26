@@ -34,46 +34,42 @@ h2 {
 <body>
 
 <div class="container">
-<h2>PeepPeePooPOO </h2>
+<h2>PeePeePooPoo Connection Test </h2>
 <div id="tasks"></div>
 </div>
 
 <script>
-//ip adress goes here
-const SERVER = "http://192.168.1.6:5000/tasks";
+
+const username = "{{ username }}";
+const SERVER = `http://192.168.1.6:5000/tasks/${username}`;
 
 async function loadTasks() {
+    try {
+        const response = await fetch(SERVER);
+        const data = await response.json();
 
-    const response = await fetch(SERVER);
-    const data = await response.json();
+        const taskContainer = document.getElementById("tasks");
+        taskContainer.innerHTML = "";
 
-    const taskContainer = document.getElementById("tasks");
-    taskContainer.innerHTML = "";
+        if (!data.tasks || data.tasks.length === 0) {
+            taskContainer.innerHTML = "<div class='task'>No tasks yet.</div>";
+            return;
+        }
 
-    for (const user in data) {
-
-        const header = document.createElement("h3");
-        header.innerText = user;
-        taskContainer.appendChild(header);
-
-        data[user].forEach((task, index) => {
-
+        data.tasks.forEach((task, index) => {
             const div = document.createElement("div");
             div.className = "task";
             div.innerText = (index + 1) + ". " + task;
-
             taskContainer.appendChild(div);
-
         });
 
+    } catch (error) {
+        console.log("Error loading tasks:", error);
     }
-
 }
 
 loadTasks();
-
 setInterval(loadTasks, 3000);
-
 </script>
 
 </body>

@@ -3,8 +3,8 @@ import json
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Go from app folder to project root
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+# Go from app/storage to project root
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
 
 # Path to data folder
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")

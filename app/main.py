@@ -1,7 +1,7 @@
 from app.bot.command_handler import handle_command
 from app.storage.task_manager import TASK_FILE
 
-user = "Emily"
+user = "killer_queen55"
 
 print("Task file is:")
 print(TASK_FILE)
