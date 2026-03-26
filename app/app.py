@@ -2,7 +2,7 @@
 from flask import Flask, jsonify, render_template, render_template_string
 
 # Import your task manager functions (these handle JSON storage)
-from storage.task_manager import get_tasks, add_task, clear_tasks   
+from storage.task_manager import get_tasks, add_task, clear_tasks, complete_task
 
 # Create the Flask server
 app = Flask(__name__)
@@ -44,6 +44,17 @@ def add_task_route(username, task):
 def clear_tasks_route(username):
     success = clear_tasks(username)
     return jsonify({"success": success, "tasks": get_tasks(username)})
+
+# Complete Task Function
+@app.route("/done/<username>/<int:task_number>")
+def done_task_route(username, task_number):
+    completed = complete_task(username, task_number)
+
+    return jsonify({
+        "success": completed is not None,
+        "completed": completed,
+        "tasks": get_tasks(username)
+    })
 
 # -------------------------
 # START SERVER
