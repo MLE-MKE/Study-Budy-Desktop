@@ -1,5 +1,5 @@
 # Import Flask tools
-from flask import Flask, jsonify, render_template, render_template_string
+from flask import Flask, jsonify, render_template
 
 # Import your task manager functions (these handle JSON storage)
 from storage.task_manager import get_tasks, add_task, clear_tasks, complete_task    
@@ -7,9 +7,6 @@ from storage.task_manager import get_tasks, add_task, clear_tasks, complete_task
 # Create the Flask server
 app = Flask(__name__)
 
-# Default user (this is who the overlay will display for now)
-# Later this will be replaced with Twitch usernames
-username = "stream"
 
 
 
