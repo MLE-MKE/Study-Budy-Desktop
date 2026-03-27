@@ -4,7 +4,7 @@ from flask import Flask, jsonify, render_template
 # Import your task manager functions (these handle JSON storage)
 from storage.task_manager import get_tasks, add_task, clear_tasks, complete_task    
 
-# Create the Flask server
+# Create the Flask serverpy app.py
 app = Flask(__name__)
 
 
