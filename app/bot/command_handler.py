@@ -139,4 +139,4 @@ def handle_command(user, message):
     # DEFAULT RESPONSE
     # PURPOSE: Catch unknown commands
     # -------------------------------------------------------
-    return "Unknown command."
+    return None

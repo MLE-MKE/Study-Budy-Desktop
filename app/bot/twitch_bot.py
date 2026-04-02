@@ -7,7 +7,7 @@ PORT = 6667
 #leave commments in for other streamers but take this one out when you package it okay
 #DONT FORGET THAT OKAY 
 BOT_NICK = "killer_queens_jester"      #replace with your bot username
-TOKEN = "oauth:kz619kjicoixwvyqvaq9wz828yk1g0"  # Replace with your Twitch OAuth token
+TOKEN = "oauth:nqfg27zyelg7c5n9u3mh1v5fti1bjd"  # Replace with your Twitch OAuth token
 CHANNEL = "#killer_queen55"  # Replace with your Twitch channel
 
 def send_message(sock, message):
