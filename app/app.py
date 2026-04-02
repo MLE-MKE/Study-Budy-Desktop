@@ -7,7 +7,8 @@ from storage.task_manager import get_tasks, add_task, clear_tasks, complete_task
 # Create the Flask serverpy app.py
 app = Flask(__name__)
 
-
+#for list cycling of task lsit per user
+priority_user = "None"
 
 
 
@@ -56,6 +57,25 @@ def done_task_route(username, task_number):
 @app.route("/tasks")
 def all_tasks_route():
     return jsonify(load_tasks())
+
+#taskl list cycling logic for overlay priority user
+@app.route("/overlay_priority/<username>")
+def set_overlay_priority(username):
+    global priority_user
+    priority_user = username
+    return jsonify({"success": True, "priority_user": priority_user})
+
+
+@app.route("/overlay_priority")
+def get_overlay_priority():
+    global priority_user
+    return jsonify({"priority_user": priority_user})
+
+@app.route("/overlay_priority/clear")
+def clear_overlay_priority():
+    global priority_user
+    priority_user = None
+    return jsonify({"success": True})
 
 # -------------------------
 # START SERVER
