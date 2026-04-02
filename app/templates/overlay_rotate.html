@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Study Budy Rotating Overlay</title>
+
+<style>
+body {
+    background: rgba(0, 0, 0, 0);
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+.container {
+    background: rgba(0, 0, 0, 0.6);
+    padding: 20px;
+    border-radius: 12px;
+    width: 320px;
+}
+
+h2 {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.task {
+    margin: 6px 0;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+    <h2 id="username">Loading...</h2>
+    <div id="tasks"></div>
+</div>
+
+<script>
+let allTasks = {};
+let userList = [];
+let currentIndex = 0;
+
+async function fetchAllTasks() {
+    try {
+        const response = await fetch("/tasks");
+        const data = await response.json();
+
+        allTasks = data || {};
+
+        userList = Object.keys(allTasks).filter(user => {
+            return Array.isArray(allTasks[user]) && allTasks[user].length > 0;
+        });
+
+        if (currentIndex >= userList.length) {
+            currentIndex = 0;
+        }
+
+        renderCurrentUser();
+    } catch (error) {
+        console.log("Error loading all tasks:", error);
+    }
+}
+
+function renderCurrentUser() {
+    const usernameEl = document.getElementById("username");
+    const tasksEl = document.getElementById("tasks");
+
+    tasksEl.innerHTML = "";
+
+    if (userList.length === 0) {
+        usernameEl.innerText = "No active task lists";
+        tasksEl.innerHTML = "<div class='task'>No tasks yet.</div>";
+        return;
+    }
+
+    const currentUser = userList[currentIndex];
+    const tasks = allTasks[currentUser] || [];
+
+    usernameEl.innerText = currentUser;
+
+    tasks.forEach((task, index) => {
+        const div = document.createElement("div");
+        div.className = "task";
+        div.innerText = (index + 1) + ". " + task;
+        tasksEl.appendChild(div);
+    });
+}
+
+function nextUser() {
+    if (userList.length === 0) {
+        return;
+    }
+
+    currentIndex = (currentIndex + 1) % userList.length;
+    renderCurrentUser();
+}
+
+// Get latest task data every 3 seconds
+fetchAllTasks();
+setInterval(fetchAllTasks, 3000);
+
+// Rotate to next user every 10 seconds
+setInterval(nextUser, 10000);
+</script>
+</body>
+</html>

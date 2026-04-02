@@ -58,6 +58,11 @@ def done_task_route(username, task_number):
 def all_tasks_route():
     return jsonify(load_tasks())
 
+# Rotating overlay page
+@app.route("/overlay")
+def rotating_overlay():
+    return render_template("overlay_rotate.html")
+
 #taskl list cycling logic for overlay priority user
 @app.route("/overlay_priority/<username>")
 def set_overlay_priority(username):
