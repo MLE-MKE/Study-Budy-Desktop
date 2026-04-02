@@ -23,7 +23,7 @@ def format_task_list(user):
         lines.append(f"{i}. {task}")
 
     # Join the numbered lines into a single string
-    return "\n".join(lines)
+    return f"{user}'s tasks: {' | '.join(lines)}"
 
 
 # -----------------------------------------------------------

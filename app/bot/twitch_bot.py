@@ -1,4 +1,5 @@
 import socket
+import urllib.request
 from app.bot.command_handler import handle_command
 
 SERVER = "irc.chat.twitch.tv"
@@ -55,7 +56,14 @@ def run_bot():
                     continue
 
                 reply = handle_command(username, message)
-
+                
+                #if the user asked for their list show on the overlay 
+                #change local host to your ip adress and make sure the port matches the one in app.py
+                if message.strip().lower() == "!tasklist":
+                    try:
+                        urllib.request.urlopen(f"http://192.168.1.6:5000/overlay_priority/{username}")
+                    except Exception as error:  
+                        print(f"Error setting overlay priority: {error}")
                 if reply:
                     send_message(sock, reply)
 

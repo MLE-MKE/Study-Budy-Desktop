@@ -55,9 +55,27 @@ async function fetchAllTasks() {
             currentIndex = 0;
         }
 
+        await checkPriorityUser();
         renderCurrentUser();
     } catch (error) {
         console.log("Error loading all tasks:", error);
+    }
+}
+
+async function checkPriorityUser() {
+    try {
+        const response = await fetch("/overlay_priority");
+        const data = await response.json();
+
+        const priorityUser = data.priority_user;
+
+        if (priorityUser && userList.includes(priorityUser)) {
+            currentIndex = userList.indexOf(priorityUser);
+
+            await fetch("/overlay_priority/clear");
+        }
+    } catch (error) {
+        console.log("Error checking priority user:", error);
     }
 }
 
@@ -95,11 +113,11 @@ function nextUser() {
     renderCurrentUser();
 }
 
-// Get latest task data every 3 seconds
+// Refresh task data every 3 seconds
 fetchAllTasks();
 setInterval(fetchAllTasks, 3000);
 
-// Rotate to next user every 10 seconds
+// Rotate every 10 seconds
 setInterval(nextUser, 10000);
 </script>
 </body>
