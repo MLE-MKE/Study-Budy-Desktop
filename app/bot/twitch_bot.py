@@ -54,7 +54,7 @@ def run_bot():
                 if not username or not message:
                     continue
 
-                reply = handle_command(username, message)
+                reply = handle_command("stream", message)
 
                 if reply:
                     send_message(sock, reply)
