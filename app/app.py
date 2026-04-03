@@ -1,5 +1,5 @@
 # Import Flask tools
-from flask import Flask, jsonify, render_template
+from flask import Flask, json, jsonify, render_template
 
 # Import your task manager functions (these handle JSON storage)
 from storage.task_manager import get_tasks, add_task, clear_tasks, complete_task, load_tasks    
@@ -62,6 +62,13 @@ def all_tasks_route():
 @app.route("/overlay")
 def rotating_overlay():
     return render_template("overlay_rotate.html")
+
+#putting my tasks on top 
+@app.route("/all_tasks")
+def all_tasks_route():
+    with open("data/tasks.json", "r") as f:
+        data = json.load(f)
+    return jsonify(data)
 
 #taskl list cycling logic for overlay priority user
 @app.route("/overlay_priority/<username>")

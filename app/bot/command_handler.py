@@ -130,7 +130,7 @@ def handle_command(user, message):
         # If the user had no tasks stored
         if not cleared:
             return f"{user} has no tasks to clear."
-
+  
         # Success response
         return f"Cleared all tasks for {user}."
 
