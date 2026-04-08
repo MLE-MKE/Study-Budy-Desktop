@@ -8,7 +8,7 @@ from storage.task_manager import get_tasks, add_task, clear_tasks, complete_task
 app = Flask(__name__)
 
 #for list cycling of task lsit per user
-priority_user = "None"
+
 
 
 
@@ -53,29 +53,7 @@ def done_task_route(username, task_number):
         "completed": completed,
         "tasks": get_tasks(username)
     })
-    
-@app.route("/tasks")
-def all_tasks_route():
-    return jsonify(load_tasks())
 
-# Rotating overlay page
-@app.route("/overlay")
-def rotating_overlay():
-    return render_template("overlay_rotate.html")
-
-#putting my tasks on top 
-@app.route("/all_tasks")
-def all_tasks_route():
-    with open("data/tasks.json", "r") as f:
-        data = json.load(f)
-    return jsonify(data)
-
-#taskl list cycling logic for overlay priority user
-@app.route("/overlay_priority/<username>")
-def set_overlay_priority(username):
-    global priority_user
-    priority_user = username
-    return jsonify({"success": True, "priority_user": priority_user})
 
 
 @app.route("/overlay_priority")

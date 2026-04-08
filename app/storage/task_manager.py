@@ -42,6 +42,12 @@ def save_tasks(tasks):
     with open(TASK_FILE, "w", encoding="utf-8") as f:
         json.dump(tasks, f, indent=4)
 
+# ---- GET TASKS FOR ALL USERS ----
+def get_all_tasks():
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        tasks = json.load(f)
+    return tasks
+
 
 # ---- GET TASKS FOR ONE USER ----
 def get_tasks(user):
