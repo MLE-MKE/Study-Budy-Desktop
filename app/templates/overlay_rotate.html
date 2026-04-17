@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Study Budy Rotating Overlay</title>
+
+<style>
+body {
+    background: rgba(0,0,0,0);
+    color: white;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    background: rgba(0,0,0,0.6);
+    padding: 20px;
+    border-radius: 12px;
+    width: 320px;
+}
+
+h2 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 24px;
+}
+
+.task {
+    margin: 6px 0;
+    font-size: 18px;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+    <h2 id="usernameTitle">Loading...</h2>
+    <div id="tasks"></div>
+</div>
+
+<script>
+let allUsers = [];
+let currentIndex = 0;
+let lockedUser = null;
+let lastPriorityUser = null;
+
+async function fetchAllTasks() {
+    try {
+        const response = await fetch("/all_tasks");
+        const data = await response.json();
+
+        allUsers = Object.keys(data)
+            .filter(username => Array.isArray(data[username]) && data[username].length > 0)
+            .map(username => ({
+                username: username,
+                tasks: data[username]
+            }));
+
+        if (allUsers.length === 0) {
+            document.getElementById("usernameTitle").innerText = "No active tasks";
+            document.getElementById("tasks").innerHTML = "<div class='task'>Waiting for tasks...</div>";
+        }
+    } catch (error) {
+        console.log("Error loading all tasks:", error);
+    }
+}
+
+async function fetchPriorityUser() {
+    try {
+        const response = await fetch("/overlay_priority");
+        const data = await response.json();
+
+        if (data.priority_user && data.priority_user !== "None") {
+            lockedUser = data.priority_user;
+        } else {
+            lockedUser = null;
+        }
+    } catch (error) {
+        console.log("Error loading priority user:", error);
+    }
+}
+
+function renderUser(userData) {
+    const usernameTitle = document.getElementById("usernameTitle");
+    const taskContainer = document.getElementById("tasks");
+
+    usernameTitle.innerText = userData.username;
+    taskContainer.innerHTML = "";
+
+    if (!userData.tasks || userData.tasks.length === 0) {
+        taskContainer.innerHTML = "<div class='task'>No tasks yet.</div>";
+        return;
+    }
+
+    userData.tasks.forEach((task, index) => {
+        const div = document.createElement("div");
+        div.className = "task";
+        div.innerText = (index + 1) + ". " + task;
+        taskContainer.appendChild(div);
+    });
+}
+
+function showNextUser() {
+    if (allUsers.length === 0) {
+        return;
+    }
+
+    if (lockedUser) {
+        const priorityMatch = allUsers.find(user => user.username.toLowerCase() === lockedUser.toLowerCase());
+
+        if (priorityMatch) {
+            renderUser(priorityMatch);
+            return;
+        }
+    }
+
+    if (currentIndex >= allUsers.length) {
+        currentIndex = 0;
+    }
+
+    renderUser(allUsers[currentIndex]);
+    currentIndex++;
+}
+
+async function refreshOverlay() {
+    await fetchAllTasks();
+    await fetchPriorityUser();
+   showNextUser();
+}
+
+refreshOverlay();
+
+setInterval(showNextUser, 15000);
+</script>
+</body>
+</html>

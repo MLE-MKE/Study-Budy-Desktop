@@ -44,9 +44,7 @@ def save_tasks(tasks):
 
 # ---- GET TASKS FOR ALL USERS ----
 def get_all_tasks():
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        tasks = json.load(f)
-    return tasks
+    return load_tasks()
 
 
 # ---- GET TASKS FOR ONE USER ----
