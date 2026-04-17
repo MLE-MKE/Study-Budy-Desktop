@@ -26,6 +26,10 @@ h2 {
 .task {
     margin: 6px 0;
 }
+.task.done {
+    text-decoration: line-through;
+    color: gray;    
+}
 
 </style>
 
@@ -58,12 +62,27 @@ async function loadTasks() {
             return;
         }
 
-        data.tasks.forEach((task, index) => {
-            const div = document.createElement("div");
-            div.className = "task";
-            div.innerText = (index + 1) + ". " + task;
-            taskContainer.appendChild(div);
-        });
+       data.tasks.forEach((task, index) => {
+    const div = document.createElement("div");
+    div.className = "task";
+
+    let taskText = "";
+    let isDone = false;
+
+    if (typeof task === "string") {
+        taskText = task;
+    } else {
+        taskText = task.text || "";
+        isDone = !!task.done;
+    }
+
+    if (isDone) {
+        div.classList.add("done");
+    }
+
+    div.innerText = (index + 1) + ". " + taskText;
+    taskContainer.appendChild(div);
+});
 
     } catch (error) {
         console.log("Error loading tasks:", error);

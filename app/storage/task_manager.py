@@ -42,15 +42,50 @@ def save_tasks(tasks):
     with open(TASK_FILE, "w", encoding="utf-8") as f:
         json.dump(tasks, f, indent=4)
 
+
+# ---- Normalize user task text ----
+def normalize_user_tasks(user_tasks):
+    normalized = []
+
+    for item in user_tasks:
+        if isinstance(item, dict):
+            normalized.append({
+                "text": item.get("text", ""),
+                "done": bool(item.get("done", False))
+            })
+        else:
+            # old string task support
+            normalized.append({
+                "text": str(item),
+                "done": False
+            })
+
+    return normalized
+
 # ---- GET TASKS FOR ALL USERS ----
+
 def get_all_tasks():
-    return load_tasks()
+    tasks = load_tasks()
+
+    for user in tasks:
+        tasks[user] = normalize_user_tasks(tasks[user])
+
+    save_tasks(tasks)
+    return tasks
+
 
 
 # ---- GET TASKS FOR ONE USER ----
 def get_tasks(user):
     tasks = load_tasks()
-    return tasks.get(user, [])
+    user_tasks = tasks.get(user, [])
+    normalized = normalize_user_tasks(user_tasks)
+
+    if user in tasks and tasks[user] != normalized:
+        tasks[user] = normalized
+        save_tasks(tasks)
+
+    return normalized
 
 
 # ---- ADD TASK FOR ONE USER ----
@@ -60,10 +95,15 @@ def add_task(user, task):
     if user not in tasks:
         tasks[user] = []
 
-    tasks[user].append(task)
-    save_tasks(tasks)
+    tasks[user] = normalize_user_tasks(tasks[user])
+    tasks[user].append({
+        "text": task,
+        "done": False
+    })
 
+    save_tasks(tasks)
     return tasks[user]
+
 
 
 # ---- COMPLETE TASK FOR ONE USER ----
@@ -73,14 +113,35 @@ def complete_task(user, task_number):
     if user not in tasks:
         return None
 
+    tasks[user] = normalize_user_tasks(tasks[user])
+
     if task_number < 1 or task_number > len(tasks[user]):
         return None
 
-    completed_task = tasks[user].pop(task_number - 1)
-    save_tasks(tasks)
+    tasks[user][task_number - 1]["done"] = True
+    completed_task = tasks[user][task_number - 1]
 
+    save_tasks(tasks)
     return completed_task
 
+
+# ---- UNDO COMPLETE TASK FOR ONE USER ----
+def undo_task(user, task_number):
+    tasks = load_tasks()
+
+    if user not in tasks:
+        return None
+
+    tasks[user] = normalize_user_tasks(tasks[user])
+
+    if task_number < 1 or task_number > len(tasks[user]):
+        return None
+
+    tasks[user][task_number - 1]["done"] = False
+    undone_task = tasks[user][task_number - 1]
+
+    save_tasks(tasks)
+    return undone_task
 
 # ---- CLEAR ALL TASKS FOR ONE USER ----
 def clear_tasks(user):
@@ -91,9 +152,11 @@ def clear_tasks(user):
 
     del tasks[user]
     save_tasks(tasks)
-
     return True
 
+# ---- Strike Text ----
+def strike_text(text):
+    return "".join(char + "\u0336" for char in text)
 
 # ---- FORMAT TASKS FOR DISPLAY ----
 def format_tasks(user):
@@ -104,6 +167,12 @@ def format_tasks(user):
 
     lines = []
     for i, task in enumerate(user_tasks, start=1):
-        lines.append(f"{i}. {task}")
+        if task["done"]:
+            # Twitch-safe fallback
+            lines.append(f"{i}. [DONE] {task['text']}")
+            # Or use this instead if you prefer the unicode strike look:
+            # lines.append(f"{i}. {strike_text(task['text'])}")
+        else:
+            lines.append(f"{i}. {task['text']}")
 
-    return "\n".join(lines)
+    return " | ".join(lines)

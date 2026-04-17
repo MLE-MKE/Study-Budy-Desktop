@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, render_template
-from storage.task_manager import get_tasks, add_task, clear_tasks, complete_task, load_tasks
+from storage.task_manager import get_tasks, add_task, clear_tasks, complete_task, load_tasks, get_all_tasks, undo_task
 
 app = Flask(__name__)
 
@@ -52,7 +52,7 @@ def done_task_route(username, task_number):
 
 @app.route("/all_tasks")
 def all_tasks_route():
-    return jsonify(load_tasks())
+    return jsonify(get_all_tasks())
 
 
 @app.route("/overlay_priority/<username>")

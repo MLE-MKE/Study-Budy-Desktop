@@ -1,55 +1,134 @@
 {
     "riggmo": [
-        "go drink some water for a change",
-        "MAKE THIS CHANNEL A RUNESCAPE CHANNEL AGAIN !"
+        {
+            "text": "go drink some water for a change",
+            "done": false
+        },
+        {
+            "text": "MAKE THIS CHANNEL A RUNESCAPE CHANNEL AGAIN !",
+            "done": false
+        }
     ],
     "your mom": [
-        "eat your veggies"
+        {
+            "text": "eat your veggies",
+            "done": false
+        }
     ],
     "killer_queens_jester": [
-        "um",
-        "seperate user task test"
+        {
+            "text": "um",
+            "done": false
+        },
+        {
+            "text": "seperate user task test",
+            "done": false
+        }
     ],
     "porkknox": [
-        "Overthrow the oligarchy",
-        "Open the straight of Hormuz by myself",
-        "bounce on it crazy style",
-        "sit and spin on it, and by it, heh well lets just say, my epanuts"
+        {
+            "text": "Overthrow the oligarchy",
+            "done": false
+        },
+        {
+            "text": "Open the straight of Hormuz by myself",
+            "done": false
+        },
+        {
+            "text": "bounce on it crazy style",
+            "done": false
+        },
+        {
+            "text": "sit and spin on it, and by it, heh well lets just say, my epanuts",
+            "done": false
+        }
     ],
     "musiclover2193": [],
     "daddycomessoon": [
-        "Slay",
-        "slay",
-        "Hawk Tuah",
-        "fix kwables!!!!"
+        {
+            "text": "Slay",
+            "done": false
+        },
+        {
+            "text": "slay",
+            "done": false
+        },
+        {
+            "text": "Hawk Tuah",
+            "done": false
+        },
+        {
+            "text": "fix kwables!!!!",
+            "done": false
+        }
     ],
     "gingerliquor": [],
     "keencrafts": [
-        "Convince KQ to come work with me at my NPO doing DLP on the ISAP",
-        "Create the entire automation for InfoSec playbooks through XDR MSDefender for NPO",
-        "Oil Dinner and Change"
+        {
+            "text": "Convince KQ to come work with me at my NPO doing DLP on the ISAP",
+            "done": false
+        },
+        {
+            "text": "Create the entire automation for InfoSec playbooks through XDR MSDefender for NPO",
+            "done": false
+        },
+        {
+            "text": "Oil Dinner and Change",
+            "done": false
+        },
+        {
+            "text": "Benchy 3D Print",
+            "done": true
+        }
     ],
     "killer_queen55": [
-        "sort notebooks",
-        "have the task bot cross off done items",
-        "study for food exam",
-        "emails business",
-        "streamerdap",
-        "grat journal"
+        {
+            "text": "sort notebooks",
+            "done": false
+        },
+        {
+            "text": "have the task bot cross off done items",
+            "done": false
+        },
+        {
+            "text": "streamerdap",
+            "done": false
+        },
+        {
+            "text": "figure out the tasklist delay",
+            "done": false
+        },
+        {
+            "text": "test",
+            "done": true
+        }
     ],
     "babysquidqueenofhell": [
-        "new T2 signs",
-        "sort back order invoices",
-        "do not murder a man"
+        {
+            "text": "new T2 signs",
+            "done": false
+        },
+        {
+            "text": "sort back order invoices",
+            "done": false
+        },
+        {
+            "text": "do not murder a man",
+            "done": false
+        }
     ],
     "ambientambient": [
-        "Also be as cool as KQ"
+        {
+            "text": "Also be as cool as KQ",
+            "done": false
+        }
     ],
     "deadchr0me": [],
-    "techpickle": [
-        "server updates"
-    ],
+    "techpickle": [],
     "buhhsbot": [
-        "grat journal"
+        {
+            "text": "grat journal",
+            "done": false
+        }
     ]
 }
