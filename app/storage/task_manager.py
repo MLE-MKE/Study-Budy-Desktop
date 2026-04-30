@@ -125,23 +125,29 @@ def complete_task(user, task_number):
     return completed_task
 
 
-# ---- UNDO COMPLETE TASK FOR ONE USER ----
-def undo_task(user, task_number):
+# ---- REMOVE ONE TASK FOR ONE USER ----
+def remove_task(user, task_number):
     tasks = load_tasks()
 
+    # If this user has no tasks, there is nothing to remove
     if user not in tasks:
         return None
 
+    # Make sure old string tasks and new dictionary tasks both work
     tasks[user] = normalize_user_tasks(tasks[user])
 
+    # Stop if the task number is too small or too big
     if task_number < 1 or task_number > len(tasks[user]):
         return None
 
-    tasks[user][task_number - 1]["done"] = False
-    undone_task = tasks[user][task_number - 1]
+    # Remove the chosen task from the list
+    removed_task = tasks[user].pop(task_number - 1)
 
+    # Save the updated task list
     save_tasks(tasks)
-    return undone_task
+
+    # Return the removed task so chat can say wharemove_taskt got cleared
+    return removed_task
 
 # ---- CLEAR ALL TASKS FOR ONE USER ----
 def clear_tasks(user):

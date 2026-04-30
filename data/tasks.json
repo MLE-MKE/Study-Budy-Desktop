@@ -62,7 +62,12 @@
             "done": false
         }
     ],
-    "gingerliquor": [],
+    "gingerliquor": [
+        {
+            "text": "Pull the phantasmal flames charizard.",
+            "done": false
+        }
+    ],
     "keencrafts": [
         {
             "text": "Convince KQ to come work with me at my NPO doing DLP on the ISAP",
@@ -73,15 +78,7 @@
             "done": false
         },
         {
-            "text": "Oil Dinner and Change",
-            "done": true
-        },
-        {
             "text": "Benchy 3D Print",
-            "done": true
-        },
-        {
-            "text": "Breach Forensics review report",
             "done": true
         }
     ],
@@ -111,60 +108,28 @@
         {
             "text": "grat journal",
             "done": false
+        },
+        {
+            "text": "test",
+            "done": false
+        },
+        {
+            "text": "booty",
+            "done": false
+        },
+        {
+            "text": "test 333333",
+            "done": false
         }
     ],
     "killer_queen55": [
         {
-            "text": "create a subathon thingy",
-            "done": true
-        },
-        {
-            "text": "fix the tasklist",
+            "text": "test1",
             "done": false
         },
         {
-            "text": "get some sun",
+            "text": "booty",
             "done": true
-        },
-        {
-            "text": "streamer dap",
-            "done": true
-        },
-        {
-            "text": "emails",
-            "done": true
-        },
-        {
-            "text": "have task list cross off done items",
-            "done": true
-        },
-        {
-            "text": "finalize labels",
-            "done": true
-        },
-        {
-            "text": "order labels",
-            "done": false
-        },
-        {
-            "text": "turn emotes into hoop designs",
-            "done": false
-        },
-        {
-            "text": "design hoop designs",
-            "done": false
-        },
-        {
-            "text": "fix task list",
-            "done": false
-        },
-        {
-            "text": "test",
-            "done": true
-        },
-        {
-            "text": "test test",
-            "done": false
         }
     ]
 }

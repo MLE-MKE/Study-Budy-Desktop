@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, render_template
-from storage.task_manager import get_tasks, add_task, clear_tasks, complete_task, load_tasks, get_all_tasks, undo_task
+from storage.task_manager import get_tasks, add_task, clear_tasks, complete_task, load_tasks, get_all_tasks
 
 app = Flask(__name__)
 
@@ -12,7 +12,7 @@ def home():
 
 
 # Main OBS overlay: rotating all users
-@app.route("/overlay")
+@app.route("/overlay")      
 def rotating_overlay():
     return render_template("overlay_rotate.html")
 

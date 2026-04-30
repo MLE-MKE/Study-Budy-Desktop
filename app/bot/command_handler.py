@@ -1,5 +1,5 @@
 # Import the task functions from task_manager
-from app.storage.task_manager import add_task, get_tasks, complete_task, clear_tasks, format_tasks
+from app.storage.task_manager import add_task, get_tasks, complete_task, clear_tasks, format_tasks, remove_task
 
 
 # ---- FORMAT TASK LIST FOR CHAT ----
@@ -71,23 +71,18 @@ def handle_command(user, message):
         return f"Added {len(cleaned_tasks)} tasks for {user}."
 
 
-    # -------------------------------------------------------
+       # -------------------------------------------------------
     # COMMAND: !tasklist
     # PURPOSE: Show the user's current tasks
     # -------------------------------------------------------
-    if message == "!tasklist":
+    if lower_message == "!tasklist":
         return format_task_list(user)
-    
-    
+
+
     # -------------------------------------------------------
     # COMMAND TYPOS: !tasklist
     # PURPOSE: Catch common fast-typing mistakes for !tasklist
     # -------------------------------------------------------
-
-    # Make the command lowercase so !Tasklist and !TASKLIST still work
-    lower_message = message.lower()
-    
-    # These are common ways someone might misspell !tasklist while typing fast
     tasklist_typos = [
         "!tasklsit",
         "!taslkist",
@@ -100,8 +95,6 @@ def handle_command(user, message):
         "!tasklost",
         "!tasklust",
         "!taskliest",
-        "!tasklisy",
-        "!tasklisy",
         "!takslist",
         "!taklist",
         "!taslist",
@@ -114,70 +107,81 @@ def handle_command(user, message):
         "!taasklist",
         "!tsklist",
         "!tastlist",
-        "!tasklisy",
-        "!tasklisy",
         "!tasklistt",
-        "!tasklisy",
         "!tasjlist",
         "!tasklisr",
         "!tasklisg",
         "!tasklisf",
         "!tasklisd",
-        "!tasklisy",
         "!tasklisu",
         "!tasklisi",
         "!taskliso",
     ]
 
-    # If someone types a typo, tell them the correct command
-    if message.lower() in tasklist_typos:
+    if lower_message in tasklist_typos:
         return "Did you mean !tasklist? you dyslexic bish"
 
 
-        # -------------------------------------------------------
+    # -------------------------------------------------------
     # COMMAND: !done
     # Example: !done 2
     # PURPOSE: Mark one numbered task as complete
     # -------------------------------------------------------
-    if message.startswith("!done "):
+    if lower_message.startswith("!done "):
 
-        # Pull the number after !done
         number_text = message[len("!done "):].strip()
 
-        # Make sure the user entered a number
         if not number_text.isdigit():
             return "Use !done followed by a task number."
 
-        # Convert the number text into an integer
         task_number = int(number_text)
 
-        # Mark that task as done
         completed = complete_task(user, task_number)
 
-        # If the task number was invalid
         if completed is None:
             return "That task number does not exist."
 
-        # Return the completed task text without printing the whole dictionary
         completed_text = completed.get("text", "task")
         return f"Completed task for {user}: {completed_text}"
-    
-    
+
+
     # -------------------------------------------------------
     # COMMAND: !clear
-    # PURPOSE: Remove all tasks for this user
+    # Example: !clear or !clear 3
+    # PURPOSE: Clear either one task or the whole task list
     # -------------------------------------------------------
-    if message == "!clear":
+    if lower_message == "!clear" or lower_message.startswith("!clear "):
 
-        # Try to clear all tasks for the user
-        cleared = clear_tasks(user)
+        print(f"DEBUG CLEAR COMMAND: user={user}, message={message}, lower_message={lower_message}")
 
-        # If the user had no tasks stored
-        if not cleared:
-            return f"{user} has no tasks to clear."
-  
-        # Success response
-        return f"Cleared all tasks for {user}."
+        clear_text = message[len("!clear"):].strip()
+
+        print(f"DEBUG CLEAR TEXT: clear_text={clear_text}")
+
+        if not clear_text:
+
+            cleared = clear_tasks(user)
+
+            if not cleared:
+                return f"{user} has no tasks to clear."
+
+            return f"Cleared all tasks for {user}."
+
+        if not clear_text.isdigit():
+            return "Use !clear by itself to clear all tasks, or !clear followed by a task number."
+
+        task_number = int(clear_text)
+
+        removed = remove_task(user, task_number)
+
+        print(f"DEBUG REMOVED TASK: removed={removed}")
+
+        if removed is None:
+            return "That task number does not exist."
+
+        removed_text = removed.get("text", "task")
+
+        return f"Cleared task {task_number} for {user}: {removed_text}"
 
 
     # -------------------------------------------------------
