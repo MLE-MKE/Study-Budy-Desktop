@@ -56,17 +56,18 @@ def run_bot():
                     continue
 
                 reply = handle_command(username, message)
-                
-                #if the user asked for their list show on the overlay 
-                #change local host to your ip adress and make sure the port matches the one in app.py
+
+                # ---- SET OVERLAY PRIORITY WHEN TASK LIST IS REQUESTED ----
+                # PURPOSE: Tell the Flask overlay server which user's tasks should appear first
+                # NOTE: This IP should match the computer running app.py
                 if message.strip().lower() == "!tasklist":
                     try:
-                        urllib.request.urlopen(f"http://192.168.1.6:5000/overlay_priority/{username}")
-                    except Exception as error:  
+                        urllib.request.urlopen(f"http://192.168.1.2:5000/overlay_priority/{username}")
+                    except Exception as error:
                         print(f"Error setting overlay priority: {error}")
+
                 if reply:
                     send_message(sock, reply)
-
 
 if __name__ == "__main__":
     run_bot()

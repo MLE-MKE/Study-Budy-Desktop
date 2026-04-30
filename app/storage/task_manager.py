@@ -159,20 +159,27 @@ def strike_text(text):
     return "".join(char + "\u0336" for char in text)
 
 # ---- FORMAT TASKS FOR DISPLAY ----
+# PURPOSE: Format tasks for Twitch chat and other text output
 def format_tasks(user):
     user_tasks = get_tasks(user)
 
+    # If no tasks exist, return a simple message
     if not user_tasks:
         return "No tasks found."
 
+    # Store each formatted task line here
     lines = []
+
+    # Loop through all tasks and format them
     for i, task in enumerate(user_tasks, start=1):
+
+        # If the task is marked done, show it with a strike-through effect
         if task["done"]:
-            # Twitch-safe fallback
-            lines.append(f"{i}. [DONE] {task['text']}")
-            # Or use this instead if you prefer the unicode strike look:
-            # lines.append(f"{i}. {strike_text(task['text'])}")
+            lines.append(f"{i}. {strike_text(task['text'])}")
+
+        # If the task is not done, show normal text
         else:
             lines.append(f"{i}. {task['text']}")
 
+    # Join all tasks into one Twitch-friendly message
     return " | ".join(lines)

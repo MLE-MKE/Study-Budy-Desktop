@@ -1,30 +1,16 @@
 # Import the task functions from task_manager
-from app.storage.task_manager import add_task, get_tasks, complete_task, clear_tasks
+from app.storage.task_manager import add_task, get_tasks, complete_task, clear_tasks, format_tasks
 
 
-# -----------------------------------------------------------
-# FUNCTION: format_task_list
-# PURPOSE: Convert a user's tasks into a numbered list string
-# -----------------------------------------------------------
+# ---- FORMAT TASK LIST FOR CHAT ----
 def format_task_list(user):
 
-    # Get the list of tasks for this user
-    tasks = get_tasks(user)
+    task_text = format_tasks(user)
 
-    # If the user has no tasks yet, return a message
-    if not tasks:
+    if task_text == "No tasks found.":
         return f"{user} has no tasks."
 
-    # This list will hold each numbered line
-    lines = []
-
-    # Loop through tasks and number them starting at 1
-    for i, task in enumerate(tasks, start=1):
-        lines.append(f"{i}. {task}")
-
-    # Join the numbered lines into a single string
-    return f"{user}'s tasks: {' | '.join(lines)}"
-
+    return f"{user}'s tasks: {task_text}"
 
 # -----------------------------------------------------------
 # FUNCTION: handle_command
@@ -115,7 +101,8 @@ def handle_command(user, message):
             return "That task number does not exist."
 
         # Return a success message
-        return f"Completed task for {user}: {completed}"
+    completed_text = completed.get("text", "task")
+    return f"Completed task for {user}: {completed_text}"
 
 
     # -------------------------------------------------------
