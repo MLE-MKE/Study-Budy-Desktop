@@ -1,6 +1,13 @@
 # Import the task functions from task_manager
 from app.storage.task_manager import add_task, get_tasks, complete_task, clear_tasks, format_tasks, remove_task
 
+# ---- USERS ALLOWED TO CLEAR OTHER USERS TASKS ----
+# what this section does: only these usernames can clear someone else's task list
+ALLOWED_CLEAR_USERS = [
+    "killer_queen55",
+    "killer_queens_jester",
+    # "mod_username_here",
+]
 
 # ---- FORMAT TASK LIST FOR CHAT ----
 def format_task_list(user):
@@ -145,45 +152,94 @@ def handle_command(user, message):
         return f"Completed task for {user}: {completed_text}"
 
 
-    # -------------------------------------------------------
+       # -------------------------------------------------------
     # COMMAND: !clear
-    # Example: !clear or !clear 3
-    # PURPOSE: Clear either one task or the whole task list
+    # Example: !clear 3, !clear all, or !clear @username
+    # PURPOSE: Clear one task, my whole list, or another user's list if I am allowed
     # -------------------------------------------------------
     if lower_message == "!clear" or lower_message.startswith("!clear "):
 
-        print(f"DEBUG CLEAR COMMAND: user={user}, message={message}, lower_message={lower_message}")
-
+        # Pull anything typed after !clear
         clear_text = message[len("!clear"):].strip()
 
-        print(f"DEBUG CLEAR TEXT: clear_text={clear_text}")
+        # Make a lowercase copy so commands are easier to compare
+        clear_text_lower = clear_text.lower()
 
+        # Normalize the person who typed the command
+        command_user = user.lower()
+
+        # If no number or target was given, do NOT clear everything by accident
         if not clear_text:
+            return "Use !clear 3 to clear one task, !clear all to clear your list, or !clear @user if you are allowed."
 
+        # -------------------------------------------------------
+        # COMMAND: !clear @username
+        # PURPOSE: Let only approved users clear another user's whole list
+        # -------------------------------------------------------
+        if clear_text.startswith("@"):
+
+            # Stop regular viewers from clearing other people's task lists
+            if command_user not in ALLOWED_CLEAR_USERS:
+                return "Only the streamer or mods can clear another user's tasks."
+
+            # Remove the @ symbol and clean the username
+            target_user = clear_text[1:].strip().lower()
+
+            # Stop if someone typed only !clear @
+            if not target_user:
+                return "Use !clear @username to clear another user's tasks."
+
+            # Clear that user's whole task list
+            cleared = clear_tasks(target_user)
+
+            # If that user had no tasks stored
+            if not cleared:
+                return f"{target_user} has no tasks to clear."
+
+            # Success response
+            return f"Cleared all tasks for {target_user}."
+
+        # -------------------------------------------------------
+        # COMMAND: !clear all
+        # PURPOSE: Clear my own whole task list only when I clearly type all
+        # -------------------------------------------------------
+        if clear_text_lower == "all":
+
+            # Clear the command user's full task list
             cleared = clear_tasks(user)
 
+            # If the user had no tasks stored
             if not cleared:
                 return f"{user} has no tasks to clear."
 
+            # Success response
             return f"Cleared all tasks for {user}."
 
-        if not clear_text.isdigit():
-            return "Use !clear by itself to clear all tasks, or !clear followed by a task number."
+        # -------------------------------------------------------
+        # COMMAND: !clear 3
+        # PURPOSE: Clear one task from my own task list
+        # -------------------------------------------------------
+        if clear_text.isdigit():
 
-        task_number = int(clear_text)
+            # Convert the task number text into an integer
+            task_number = int(clear_text)
 
-        removed = remove_task(user, task_number)
+            # Remove only the chosen task
+            removed = remove_task(user, task_number)
 
-        print(f"DEBUG REMOVED TASK: removed={removed}")
+            # If the task number does not exist, do not crash the bot
+            if removed is None:
+                return "That task number does not exist."
 
-        if removed is None:
-            return "That task number does not exist."
+            # Pull only the task text out of the dictionary
+            removed_text = removed.get("text", "task")
 
-        removed_text = removed.get("text", "task")
+            # Success response for clearing one task
+            return f"Cleared task {task_number} for {user}: {removed_text}"
 
-        return f"Cleared task {task_number} for {user}: {removed_text}"
-
-
+        # If the command did not match any clear format, explain the correct options
+        return "Use !clear 3, !clear all, or !clear @username if you are allowed."
+    
     # -------------------------------------------------------
     # DEFAULT RESPONSE
     # PURPOSE: Catch unknown commands
