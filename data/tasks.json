@@ -99,7 +99,12 @@
         }
     ],
     "deadchr0me": [],
-    "techpickle": [],
+    "techpickle": [
+        {
+            "text": "do nothing",
+            "done": false
+        }
+    ],
     "killer_queen55": [
         {
             "text": "test1",
