@@ -74,9 +74,61 @@ def handle_command(user, message):
     # -------------------------------------------------------
     if message == "!tasklist":
         return format_task_list(user)
-
-
+    
+    
     # -------------------------------------------------------
+    # COMMAND TYPOS: !tasklist
+    # PURPOSE: Catch common fast-typing mistakes for !tasklist
+    # -------------------------------------------------------
+
+    # These are common ways someone might misspell !tasklist while typing fast
+    tasklist_typos = [
+        "!tasklsit",
+        "!taslkist",
+        "!tasklst",
+        "!tasklis",
+        "!tasklits",
+        "!tasklit",
+        "!taskslist",
+        "!tasklisk",
+        "!tasklost",
+        "!tasklust",
+        "!taskliest",
+        "!tasklisy",
+        "!tasklisy",
+        "!takslist",
+        "!taklist",
+        "!taslist",
+        "!taskist",
+        "!taskl",
+        "!taskli",
+        "!tasklisst",
+        "!taskllist",
+        "!taskklist",
+        "!taasklist",
+        "!tsklist",
+        "!tastlist",
+        "!tasklisy",
+        "!tasklisy",
+        "!tasklistt",
+        "!tasklisy",
+        "!tasjlist",
+        "!tasklisr",
+        "!tasklisg",
+        "!tasklisf",
+        "!tasklisd",
+        "!tasklisy",
+        "!tasklisu",
+        "!tasklisi",
+        "!taskliso",
+    ]
+
+    # If someone types a typo, tell them the correct command
+    if message.lower() in tasklist_typos:
+        return "Did you mean !tasklist? you dyslexic bish"
+
+
+        # -------------------------------------------------------
     # COMMAND: !done
     # Example: !done 2
     # PURPOSE: Mark one numbered task as complete
@@ -93,18 +145,18 @@ def handle_command(user, message):
         # Convert the number text into an integer
         task_number = int(number_text)
 
-        # Try to remove that task
+        # Mark that task as done
         completed = complete_task(user, task_number)
 
         # If the task number was invalid
         if completed is None:
             return "That task number does not exist."
 
-        # Return a success message
-    completed_text = completed.get("text", "task")
-    return f"Completed task for {user}: {completed_text}"
-
-
+        # Return the completed task text without printing the whole dictionary
+        completed_text = completed.get("text", "task")
+        return f"Completed task for {user}: {completed_text}"
+    
+    
     # -------------------------------------------------------
     # COMMAND: !clear
     # PURPOSE: Remove all tasks for this user
