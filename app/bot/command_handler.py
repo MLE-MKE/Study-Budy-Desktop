@@ -21,6 +21,9 @@ def handle_command(user, message):
     # Remove extra spaces before and after the message
     message = message.strip()
 
+    # Make the message lowercase for easier command matching
+    lower_message = message.lower()
+    
     # Ignore anything that is not a command
     if not message.startswith("!"):
         return None
@@ -81,6 +84,9 @@ def handle_command(user, message):
     # PURPOSE: Catch common fast-typing mistakes for !tasklist
     # -------------------------------------------------------
 
+    # Make the command lowercase so !Tasklist and !TASKLIST still work
+    lower_message = message.lower()
+    
     # These are common ways someone might misspell !tasklist while typing fast
     tasklist_typos = [
         "!tasklsit",
