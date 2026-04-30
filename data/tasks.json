@@ -74,32 +74,14 @@
         },
         {
             "text": "Oil Dinner and Change",
-            "done": false
+            "done": true
         },
         {
             "text": "Benchy 3D Print",
             "done": true
-        }
-    ],
-    "killer_queen55": [
-        {
-            "text": "sort notebooks",
-            "done": false
         },
         {
-            "text": "have the task bot cross off done items",
-            "done": false
-        },
-        {
-            "text": "streamerdap",
-            "done": false
-        },
-        {
-            "text": "figure out the tasklist delay",
-            "done": false
-        },
-        {
-            "text": "test",
+            "text": "Breach Forensics review report",
             "done": true
         }
     ],
@@ -128,6 +110,56 @@
     "buhhsbot": [
         {
             "text": "grat journal",
+            "done": false
+        }
+    ],
+    "killer_queen55": [
+        {
+            "text": "create a subathon thingy",
+            "done": true
+        },
+        {
+            "text": "fix the tasklist",
+            "done": false
+        },
+        {
+            "text": "get some sun",
+            "done": true
+        },
+        {
+            "text": "streamer dap",
+            "done": true
+        },
+        {
+            "text": "emails",
+            "done": true
+        },
+        {
+            "text": "have task list cross off done items",
+            "done": true
+        },
+        {
+            "text": "finalize labels",
+            "done": true
+        },
+        {
+            "text": "order labels",
+            "done": false
+        },
+        {
+            "text": "turn emotes into hoop designs",
+            "done": false
+        },
+        {
+            "text": "design hoop designs",
+            "done": false
+        },
+        {
+            "text": "fix task list",
+            "done": false
+        },
+        {
+            "text": "test",
             "done": false
         }
     ]
