@@ -150,10 +150,9 @@ async function refreshOverlay() {
     await fetchAllTasks();
     await fetchPriorityUser();
    showNextUser();
-}
-
+} 
 refreshOverlay();
-setInterval(refreshOverlay, 20000);
+setInterval(refreshOverlay, 15000);
 setInterval(showNextUser, 15000);
 </script>
 </body>

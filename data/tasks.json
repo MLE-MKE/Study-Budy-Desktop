@@ -1,117 +1,35 @@
 {
-    "riggmo": [
-        {
-            "text": "go drink some water for a change",
-            "done": false
-        },
-        {
-            "text": "MAKE THIS CHANNEL A RUNESCAPE CHANNEL AGAIN !",
-            "done": false
-        }
-    ],
-    "your mom": [
-        {
-            "text": "eat your veggies",
-            "done": false
-        }
-    ],
-    "killer_queens_jester": [
-        {
-            "text": "um",
-            "done": false
-        },
-        {
-            "text": "seperate user task test",
-            "done": false
-        }
-    ],
-    "porkknox": [
-        {
-            "text": "Overthrow the oligarchy",
-            "done": false
-        },
-        {
-            "text": "Open the straight of Hormuz by myself",
-            "done": false
-        },
-        {
-            "text": "bounce on it crazy style",
-            "done": false
-        },
-        {
-            "text": "sit and spin on it, and by it, heh well lets just say, my epanuts",
-            "done": false
-        }
-    ],
-    "musiclover2193": [],
-    "daddycomessoon": [
-        {
-            "text": "Slay",
-            "done": false
-        },
-        {
-            "text": "slay",
-            "done": false
-        },
-        {
-            "text": "Hawk Tuah",
-            "done": false
-        },
-        {
-            "text": "fix kwables!!!!",
-            "done": false
-        }
-    ],
-    "gingerliquor": [
-        {
-            "text": "Pull the phantasmal flames charizard.",
-            "done": false
-        }
-    ],
-    "keencrafts": [
-        {
-            "text": "Convince KQ to come work with me at my NPO doing DLP on the ISAP",
-            "done": false
-        },
-        {
-            "text": "Create the entire automation for InfoSec playbooks through XDR MSDefender for NPO",
-            "done": false
-        }
-    ],
-    "babysquidqueenofhell": [
-        {
-            "text": "new T2 signs",
-            "done": false
-        },
-        {
-            "text": "sort back order invoices",
-            "done": false
-        },
-        {
-            "text": "do not murder a man",
-            "done": false
-        }
-    ],
-    "ambientambient": [
-        {
-            "text": "Also be as cool as KQ",
-            "done": false
-        }
-    ],
-    "deadchr0me": [],
-    "techpickle": [
-        {
-            "text": "do nothing",
-            "done": false
-        }
-    ],
     "killer_queen55": [
         {
-            "text": "test1",
+            "text": "fix task list one of these years",
             "done": false
         },
         {
-            "text": "booty",
+            "text": "edit for an hour",
+            "done": false
+        },
+        {
+            "text": "emails",
+            "done": true
+        },
+        {
+            "text": "make dr appointment",
+            "done": true
+        },
+        {
+            "text": "post transition vod",
+            "done": true
+        },
+        {
+            "text": "grat book",
+            "done": true
+        },
+        {
+            "text": "make list of recipes",
+            "done": true
+        },
+        {
+            "text": "upload passes stuff",
             "done": true
         }
     ]

@@ -1,15 +1,15 @@
 import socket
 import urllib.request
+import os
 from app.bot.command_handler import handle_command
 
 SERVER = "irc.chat.twitch.tv"
 PORT = 6667 
 
-#leave commments in for other streamers but take this one out when you package it okay
-#DONT FORGET THAT OKAY 
-BOT_NICK = "killer_queens_jester"      #replace with your bot username
-TOKEN = "oauth:nqfg27zyelg7c5n9u3mh1v5fti1bjd"  # Replace with your Twitch OAuth token
-CHANNEL = "#killer_queen55"  # Replace with your Twitch channel
+# Configuration is supplied at runtime. Never store a Twitch token in source code.
+BOT_NICK = os.getenv("STUDY_BUDY_TWITCH_BOT_NICK", "")
+TOKEN = os.getenv("STUDY_BUDY_TWITCH_TOKEN", "")
+CHANNEL = os.getenv("STUDY_BUDY_TWITCH_CHANNEL", "")
 
 def send_message(sock, message):
     sock.send(f"PRIVMSG {CHANNEL} :{message}\r\n".encode("utf-8"))
@@ -27,6 +27,12 @@ def parse_message(raw_message):
         return None, None  
     
 def run_bot():
+    if not BOT_NICK or not TOKEN or not CHANNEL:
+        raise RuntimeError(
+            "Twitch is not configured. Use the Study Budy Connections screen or "
+            "set the STUDY_BUDY_TWITCH_* environment variables for development."
+        )
+
     sock = socket.socket()
     sock.connect((SERVER, PORT))
 
@@ -62,7 +68,7 @@ def run_bot():
                 # NOTE: This IP should match the computer running app.py
                 if message.strip().lower() == "!tasklist":
                     try:
-                        urllib.request.urlopen(f"http://192.168.1.2:5000/overlay_priority/{username}")
+                        urllib.request.urlopen(f"http://127.0.0.1:5000/overlay_priority/{username}")
                     except Exception as error:
                         print(f"Error setting overlay priority: {error}")
 
