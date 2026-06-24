@@ -254,6 +254,59 @@ class TaskRepository:
         destination.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return destination
 
+    def import_json(self, source: str | Path) -> int:
+        """Merge a Study Budy export after validating every supported task."""
+        try:
+            payload = json.loads(Path(source).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValidationError("The selected file is not a valid Study Budy JSON export.") from exc
+        if payload.get("format") != "study-budy-export-v1" or not isinstance(payload.get("participants"), list):
+            raise ValidationError("This file is not a Study Budy task export.")
+        imported = 0
+        for person in payload["participants"]:
+            if not isinstance(person, dict) or not isinstance(person.get("display_name"), str):
+                raise ValidationError("The export contains an invalid participant.")
+            participant = self.get_or_create_participant(person["display_name"], person.get("participant_type", "viewer"))
+            for task in person.get("tasks", []):
+                if not isinstance(task, dict) or not isinstance(task.get("text"), str):
+                    raise ValidationError("The export contains an invalid task.")
+                created = self.add_task(participant["display_name"], task["text"], participant["participant_type"])
+                if task.get("is_complete"):
+                    self.set_task_complete(created["id"], True)
+                imported += 1
+        for key, value in payload.get("settings", {}).items():
+            if isinstance(key, str):
+                self.set_setting(key, value)
+        return imported
+
+    def migrate_legacy_json(self, source: str | Path) -> int:
+        """One-time, idempotent best-effort migration of the prototype tasks.json."""
+        source = Path(source)
+        marker = "legacy_json_migrated"
+        if self.get_setting(marker, False) or not source.exists():
+            return 0
+        try:
+            legacy = json.loads(source.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return 0
+        if not isinstance(legacy, dict):
+            return 0
+        count = 0
+        for name, tasks in legacy.items():
+            if not isinstance(name, str) or not isinstance(tasks, list):
+                continue
+            for task in tasks:
+                text = task.get("text") if isinstance(task, dict) else str(task)
+                try:
+                    added = self.add_task(name, text)
+                except ValidationError:
+                    continue
+                if isinstance(task, dict) and task.get("done"):
+                    self.set_task_complete(added["id"], True)
+                count += 1
+        self.set_setting(marker, True)
+        return count
+
     def backup(self, backup_directory: str | Path) -> Path:
         target = Path(backup_directory) / f"study-budy-{datetime.now():%Y%m%d-%H%M%S}.db"
         target.parent.mkdir(parents=True, exist_ok=True)

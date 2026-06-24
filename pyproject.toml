@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "study-budy-desktop"
+version = "0.1.0"
+description = "Standalone Twitch task manager and OBS Browser Source overlay"
+requires-python = ">=3.11"
+dependencies = [
+  "Flask>=3.0,<4.0",
+  "PySide6>=6.7,<7.0",
+  "keyring>=25.0,<26.0",
+  "requests>=2.32,<3.0",
+]
+
+[project.scripts]
+study-budy = "study_budy.main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -33,6 +33,17 @@ def test_settings_and_export_persist(repository, tmp_path):
     export = repository.export_json(tmp_path / "tasks.json")
     data = json.loads(export.read_text(encoding="utf-8"))
     assert data["participants"][0]["tasks"][0]["text"] == "Study"
+    restored = TaskRepository(tmp_path / "restored.db")
+    restored.initialize()
+    assert restored.import_json(export) == 1
+    assert restored.task_snapshot()[0]["tasks"][0]["text"] == "Study"
+
+def test_migrates_legacy_json_once(repository, tmp_path):
+    legacy = tmp_path / "tasks.json"
+    legacy.write_text(json.dumps({"luna": [{"text": "Read", "done": True}]}), encoding="utf-8")
+    assert repository.migrate_legacy_json(legacy) == 1
+    assert repository.task_snapshot()[0]["tasks"][0]["is_complete"] is True
+    assert repository.migrate_legacy_json(legacy) == 0
 
 @pytest.mark.parametrize("text", ["", "   ", "x" * (MAX_TASK_LENGTH + 1)])
 def test_rejects_invalid_task_input(repository, text):
