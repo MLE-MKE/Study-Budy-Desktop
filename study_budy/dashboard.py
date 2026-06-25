@@ -34,9 +34,10 @@ class DashboardView(QWidget):
         self.stack_right = False
         self.central_compact = False
         self.lower_stack = False
+        self.right_in_main = False
 
         self.root = QBoxLayout(QBoxLayout.Direction.LeftToRight, self)
-        self.root.setContentsMargins(18, 22, 18, 22)
+        self.root.setContentsMargins(12, 16, 12, 16)
         self.root.setSpacing(Theme.SECTION_SPACING)
 
         self.main_scroll = QScrollArea()
@@ -66,22 +67,19 @@ class DashboardView(QWidget):
         self.apply_responsive_layout(False, False, False)
 
     def _build_main(self) -> None:
-        header = QHBoxLayout()
-        title = QLabel("Dashboard")
-        title.setObjectName("H1")
-        header.addWidget(title)
-        header.addStretch(1)
+        self.header_grid = QGridLayout()
+        self.header_grid.setHorizontalSpacing(8)
+        self.header_grid.setVerticalSpacing(8)
+        self.title = QLabel("Dashboard")
+        self.title.setObjectName("H1")
         self.live_badge = QLabel()
-        header.addWidget(self.live_badge)
-        settings = QPushButton("Settings")
-        settings.setIcon(icon("settings"))
-        settings.clicked.connect(self.callbacks["appearance"])
-        header.addWidget(settings)
-        help_button = QPushButton("Help")
-        help_button.setIcon(icon("help"))
-        help_button.clicked.connect(self.callbacks["help"])
-        header.addWidget(help_button)
-        self.main.addLayout(header)
+        self.settings_button = QPushButton("Settings")
+        self.settings_button.setIcon(icon("settings"))
+        self.settings_button.clicked.connect(self.callbacks["appearance"])
+        self.help_button = QPushButton("Help")
+        self.help_button.setIcon(icon("help"))
+        self.help_button.clicked.connect(self.callbacks["help"])
+        self.main.addLayout(self.header_grid)
 
         self.card_grid = QGridLayout()
         self.card_grid.setHorizontalSpacing(Theme.SECTION_SPACING)
@@ -127,8 +125,14 @@ class DashboardView(QWidget):
 
         self.stats_card = self._stats_card()
         self.main.addWidget(self.stats_card)
-        self.viewer_card = self._viewer_window_card()
-        self.main.addWidget(self.viewer_card)
+        self.task_window_button = QPushButton("Open Task Window")
+        self.task_window_button.setObjectName("PrimaryButton")
+        self.task_window_button.setIcon(icon("window"))
+        self.task_window_button.clicked.connect(self.callbacks["task_window"])
+        task_button_row = QHBoxLayout()
+        task_button_row.addStretch(1)
+        task_button_row.addWidget(self.task_window_button)
+        self.main.addLayout(task_button_row)
         self.main.addStretch(1)
 
     def _build_right(self) -> None:
@@ -253,9 +257,12 @@ class DashboardView(QWidget):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        stack_right = self.width() < Theme.PAGE_RESPONSIVE_BREAKPOINT
+        window_width = self.window().width() if self.window() else self.width()
+        stack_right = window_width < Theme.WIDE_BREAKPOINT
         central_width = self.main_scroll.viewport().width()
-        self.apply_responsive_layout(stack_right, central_width < 700, central_width < 700)
+        central_compact = window_width < Theme.WIDE_BREAKPOINT or central_width < 760
+        lower_stack = window_width < Theme.WIDE_BREAKPOINT or central_width < 760
+        self.apply_responsive_layout(stack_right, central_compact, lower_stack)
 
     def apply_responsive_layout(self, stack_right: bool, central_compact: bool, lower_stack: bool) -> None:
         if (
@@ -269,12 +276,38 @@ class DashboardView(QWidget):
         self.central_compact = central_compact
         self.lower_stack = lower_stack
         self.root.setDirection(QBoxLayout.Direction.TopToBottom if stack_right else QBoxLayout.Direction.LeftToRight)
+        window_width = self.window().width() if self.window() else self.width()
+        if stack_right and not self.right_in_main:
+            self.root.removeWidget(self.right_scroll)
+            self.main.insertWidget(max(0, self.main.count() - 1), self.right_scroll)
+            self.right_in_main = True
+        elif not stack_right and self.right_in_main:
+            self.main.removeWidget(self.right_scroll)
+            self.root.addWidget(self.right_scroll)
+            self.right_in_main = False
+        if window_width < Theme.MEDIUM_BREAKPOINT:
+            self.root.setContentsMargins(8, 10, 8, 10)
+            self.main.setSpacing(8)
+            self.task_window_button.setMinimumWidth(0)
+        elif stack_right:
+            self.root.setContentsMargins(10, 12, 10, 12)
+            self.main.setSpacing(Theme.SECTION_SPACING)
+            self.task_window_button.setMinimumWidth(160)
+        else:
+            self.root.setContentsMargins(12, 16, 12, 16)
+            self.main.setSpacing(Theme.SECTION_SPACING)
+            self.task_window_button.setMinimumWidth(170)
         if stack_right:
             self.right_scroll.setMinimumWidth(0)
             self.right_scroll.setMaximumWidth(16777215)
+            self.right_scroll.setMinimumHeight(520)
         else:
+            self.right_scroll.setMinimumWidth(Theme.RIGHT_PANEL_MIN_WIDTH)
             self.right_scroll.setFixedWidth(Theme.RIGHT_PANEL_WIDTH)
+            self.right_scroll.setMaximumWidth(Theme.RIGHT_PANEL_WIDTH)
+            self.right_scroll.setMinimumHeight(0)
         self.two_cards.setDirection(QBoxLayout.Direction.TopToBottom if lower_stack else QBoxLayout.Direction.LeftToRight)
+        self._layout_header(window_width < Theme.MEDIUM_BREAKPOINT)
         self._layout_url(central_compact)
         while self.card_grid.count():
             item = self.card_grid.takeAt(0)
@@ -286,6 +319,27 @@ class DashboardView(QWidget):
             self.card_grid.addWidget(card, row, column)
         for column in range(4):
             self.card_grid.setColumnStretch(column, 1 if column < columns else 0)
+
+    def _layout_header(self, compact: bool) -> None:
+        while self.header_grid.count():
+            item = self.header_grid.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+        for column in range(4):
+            self.header_grid.setColumnStretch(column, 0)
+        if compact:
+            self.header_grid.addWidget(self.title, 0, 0)
+            self.header_grid.addWidget(self.live_badge, 0, 1, alignment=Qt.AlignmentFlag.AlignRight)
+            self.header_grid.addWidget(self.settings_button, 1, 0)
+            self.header_grid.addWidget(self.help_button, 1, 1)
+            self.header_grid.setColumnStretch(0, 1)
+            self.header_grid.setColumnStretch(1, 1)
+        else:
+            self.header_grid.addWidget(self.title, 0, 0)
+            self.header_grid.addWidget(self.live_badge, 0, 1, alignment=Qt.AlignmentFlag.AlignRight)
+            self.header_grid.addWidget(self.settings_button, 0, 2)
+            self.header_grid.addWidget(self.help_button, 0, 3)
+            self.header_grid.setColumnStretch(0, 1)
 
     def _layout_url(self, central_compact: bool) -> None:
         while self.url_grid.count():

@@ -130,6 +130,7 @@ class StudyBudyWindow(QMainWindow):
         self.pages.addWidget(self.checkin_page)
         self.pages.addWidget(self.help_page)
         self.pages.currentChanged.connect(self.sidebar.set_active)
+        self.sidebar.apply_responsive_width(self.width())
 
     def _tasks_page(self) -> QWidget:
         page = QWidget()
@@ -224,7 +225,7 @@ class StudyBudyWindow(QMainWindow):
         self.full_overlay_preview.refresh()
         self.full_appearance_panel.load()
         live = self.overlay_server.running
-        self.sidebar.set_system_status("All Systems Operational" if live else "Task System Offline", live)
+        self.sidebar.set_system_status("Operational" if live else "Offline", live)
 
     def start_overlay(self) -> None:
         try:
@@ -332,6 +333,11 @@ class StudyBudyWindow(QMainWindow):
         self.settings.setValue("window/geometry", self.saveGeometry())
         self.overlay_server.stop()
         super().closeEvent(event)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "sidebar"):
+            self.sidebar.apply_responsive_width(self.width())
 
 
 def run_desktop(preview: bool = False) -> int:

@@ -25,19 +25,22 @@ class Theme:
     WARNING = "#ffd84f"
 
     RADIUS = 10
-    CARD_PADDING = 14
-    SECTION_SPACING = 12
-    BUTTON_HEIGHT = 40
-    SIDEBAR_WIDTH = 190
+    CARD_PADDING = 12
+    SECTION_SPACING = 10
+    BUTTON_HEIGHT = 36
+    SIDEBAR_WIDTH = 180
+    SIDEBAR_WIDTH_MEDIUM = 145
+    SIDEBAR_WIDTH_COMPACT = 96
     RIGHT_PANEL_WIDTH = 300
     RIGHT_PANEL_MIN_WIDTH = 285
-    RESPONSIVE_BREAKPOINT = 1050
+    WIDE_BREAKPOINT = 1150
+    MEDIUM_BREAKPOINT = 850
     PAGE_RESPONSIVE_BREAKPOINT = 860
-    MIN_WINDOW_WIDTH = 950
-    MIN_WINDOW_HEIGHT = 700
-    DEFAULT_WINDOW_WIDTH = 1100
-    DEFAULT_WINDOW_HEIGHT = 800
-    FONT_STACK = "'Comic Sans MS', 'Comic Neue', 'Segoe Print', 'Segoe UI', sans-serif"
+    MIN_WINDOW_WIDTH = 760
+    MIN_WINDOW_HEIGHT = 620
+    DEFAULT_WINDOW_WIDTH = 980
+    DEFAULT_WINDOW_HEIGHT = 760
+    FONT_STACK = "'Poppins', 'Segoe UI', 'Comic Neue', sans-serif"
 
 
 def app_stylesheet() -> str:
@@ -48,7 +51,7 @@ def app_stylesheet() -> str:
         background: {Theme.BACKGROUND};
         color: {Theme.TEXT};
         font-family: {Theme.FONT_STACK};
-        font-size: 13px;
+        font-size: 12px;
     }}
     QMenuBar {{
         background: #12161b;
@@ -93,11 +96,11 @@ def app_stylesheet() -> str:
         border-radius: {Theme.RADIUS}px;
     }}
     QLabel#H1 {{
-        font-size: 28px;
+        font-size: 26px;
         font-weight: 800;
     }}
     QLabel#H2 {{
-        font-size: 15px;
+        font-size: 14px;
         font-weight: 800;
     }}
     QLabel#Muted, QLabel#SmallNote {{
@@ -134,7 +137,7 @@ def app_stylesheet() -> str:
     }}
     QPushButton {{
         min-height: {Theme.BUTTON_HEIGHT}px;
-        min-width: 96px;
+        min-width: 84px;
         background: {Theme.PANEL_ALT};
         border: 1px solid #3a424e;
         border-radius: 8px;
