@@ -10,7 +10,7 @@ from pathlib import Path
 from PySide6.QtCore import QSettings, Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
     QFrame, QGridLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow, QMessageBox,
     QPushButton, QSpinBox, QStackedWidget, QTextBrowser, QTreeWidget, QTreeWidgetItem,
     QVBoxLayout, QWidget,
@@ -18,8 +18,10 @@ from PySide6.QtWidgets import (
 
 from .overlay_service import DEFAULT_APPEARANCE
 from .paths import prepare_user_data_dir
-from .server import OverlayServer, OverlayServerError
+from .preview import seed_preview_data
+from .server import OverlayServer, OverlayServerError, choose_available_port
 from .storage import TaskRepository, ValidationError
+from .task_window import TaskWindow
 
 LOG = logging.getLogger(__name__)
 
@@ -29,6 +31,7 @@ class StudyBudyWindow(QMainWindow):
         super().__init__()
         self.repository, self.overlay_server = repository, overlay_server
         self.settings = QSettings("Hotkey LLC", "Study Budy")
+        self.task_window: TaskWindow | None = None
         self.setWindowTitle("Study Budy Desktop")
         self.setWindowIcon(QIcon(str(Path(__file__).with_name("assets") / "study-budy-icon.svg")))
         self.setMinimumSize(980, 640)
@@ -49,7 +52,7 @@ class StudyBudyWindow(QMainWindow):
         file_menu.addAction("Exit", self.close)
         view_menu = self.menuBar().addMenu("&View")
         for index, name in enumerate(("Dashboard", "Tasks", "Connections", "Appearance", "Help")):
-            view_menu.addAction(name, lambda checked=False, page=index: self.pages.setCurrentIndex(page))
+            view_menu.addAction(name, self.open_task_window if name == "Tasks" else lambda checked=False, page=index: self.pages.setCurrentIndex(page))
         view_menu.addAction("Refresh overlay", self.restart_overlay)
         view_menu.addAction("Reset window layout", self.reset_window)
         settings_menu = self.menuBar().addMenu("&Settings")
@@ -73,7 +76,7 @@ class StudyBudyWindow(QMainWindow):
         rail_layout.addWidget(QLabel("<h2>Study Budy</h2><p>STREAM TASK CONTROL</p>"))
         self.pages = QStackedWidget()
         for index, name in enumerate(("Dashboard", "Tasks", "Connections", "Appearance", "Help")):
-            button = QPushButton(name); button.clicked.connect(lambda checked=False, page=index: self.pages.setCurrentIndex(page)); rail_layout.addWidget(button)
+            button = QPushButton(name); button.clicked.connect(self.open_task_window if name == "Tasks" else lambda checked=False, page=index: self.pages.setCurrentIndex(page)); rail_layout.addWidget(button)
         rail_layout.addStretch(1)
         self.status_label = QLabel("Offline")
         rail_layout.addWidget(self.status_label)
@@ -98,6 +101,7 @@ class StudyBudyWindow(QMainWindow):
             button = QPushButton(title); button.clicked.connect(callback); actions.addWidget(button)
         controls.addLayout(actions); lower.addWidget(control_card); main.addLayout(lower)
         self.session_stats = QLabel(); self.session_stats.setObjectName("stats"); main.addWidget(self.session_stats); main.addStretch(1)
+        task_button = QPushButton("Open Task Window"); task_button.clicked.connect(self.open_task_window); main.addWidget(task_button)
         preview_card = QFrame(); preview_card.setObjectName("card"); preview_box = QVBoxLayout(preview_card); preview_box.addWidget(QLabel("<h3>◉  Overlay Preview</h3>")); self.overlay_preview = QTextBrowser(); self.overlay_preview.setMinimumWidth(290); self.overlay_preview.setMinimumHeight(320); preview_box.addWidget(self.overlay_preview); side.addWidget(preview_card); side.addWidget(QLabel("<h3>◉  Appearance</h3><p>Use the Appearance section for fonts, colors, opacity, layout, and images.</p>")); side.addStretch(1)
         return page
 
@@ -114,7 +118,10 @@ class StudyBudyWindow(QMainWindow):
     def _connections_page(self) -> QWidget:
         page = QWidget(); box = QVBoxLayout(page); box.addWidget(QLabel("<h1>Connections</h1>"))
         self.twitch_status = QLabel(); box.addWidget(self.twitch_status)
-        setup = QPushButton("Configure Twitch channel"); setup.clicked.connect(self.configure_twitch); box.addWidget(setup)
+        setup = QPushButton("Connect Streamer Account (channel setup)"); setup.clicked.connect(self.configure_twitch); box.addWidget(setup)
+        bot = QPushButton("Connect Bot Account (development mode)"); bot.clicked.connect(self.enable_development_bot); box.addWidget(bot)
+        reconnect = QPushButton("Reconnect"); reconnect.clicked.connect(self.refresh_connections); box.addWidget(reconnect)
+        disconnect = QPushButton("Disconnect"); disconnect.clicked.connect(self.disconnect_twitch); box.addWidget(disconnect)
         test = QPushButton("Add safe test viewer task"); test.clicked.connect(self.add_test_task); box.addWidget(test)
         box.addWidget(QLabel("OBS and Streamlabs Desktop work through the Browser Source URL. OBS WebSocket is optional and is not required for the overlay."))
         box.addStretch(1); return page
@@ -123,8 +130,8 @@ class StudyBudyWindow(QMainWindow):
         page = QWidget(); box = QVBoxLayout(page); box.addWidget(QLabel("<h1>Appearance</h1><p>Changes are saved and used by the live overlay.</p>"))
         form = QFormLayout(); self.layout_mode = QComboBox(); self.layout_mode.addItem("Cycle everyone", "cycle"); self.layout_mode.addItem("Streamer on top", "streamer_top")
         self.cycle_seconds = QSpinBox(); self.cycle_seconds.setRange(3, 300); self.cycle_seconds.setSuffix(" seconds")
-        self.font_name = QLineEdit(); self.text_color = QLineEdit(); self.background_color = QLineEdit(); self.opacity = QSpinBox(); self.opacity.setRange(0, 100); self.opacity.setSuffix(" %")
-        for label, field in (("Layout", self.layout_mode), ("Cycle duration", self.cycle_seconds), ("Font family", self.font_name), ("Text color", self.text_color), ("Background color", self.background_color), ("Background opacity", self.opacity)): form.addRow(label, field)
+        self.font_name = QLineEdit(); self.text_color = QLineEdit(); self.background_color = QLineEdit(); self.opacity = QSpinBox(); self.opacity.setRange(0, 100); self.opacity.setSuffix(" %"); self.show_finished = QCheckBox("Show Finished Tasks")
+        for label, field in (("Layout", self.layout_mode), ("Cycle duration", self.cycle_seconds), ("Font family", self.font_name), ("Text color", self.text_color), ("Background color", self.background_color), ("Background opacity", self.opacity), ("Overlay content", self.show_finished)): form.addRow(label, field)
         box.addLayout(form); save = QPushButton("Save appearance and refresh overlay"); save.clicked.connect(self.save_appearance); box.addWidget(save); preview = QPushButton("Open live preview"); preview.clicked.connect(self.open_preview); box.addWidget(preview); box.addStretch(1); return page
 
     def _help_page(self) -> QWidget:
@@ -138,9 +145,9 @@ class StudyBudyWindow(QMainWindow):
         status = "Live — overlay service running" if self.overlay_server.running else "Offline — overlay service stopped"
         self.status_label.setText(status); self.dashboard_status.setText(status); self.overlay_url.setText(self.overlay_server.url)
         participants = self.repository.task_snapshot(); incomplete = sum(not task["is_complete"] for person in participants for task in person["tasks"]); completed = sum(task["is_complete"] for person in participants for task in person["tasks"])
-        self.session_stats.setText(f"Active participants: {len(participants)}   •   Incomplete tasks: {incomplete}   •   Completed tasks: {completed}")
-        self.twitch_card.value_label.setText("Connected" if self.repository.get_setting("twitch_channel", "") else "Not configured")
-        self.obs_card.value_label.setText("Browser Source ready")
+        self.session_stats.setText(f"{self.repository.lifetime_completed()}  Total Tasks Completed To Date\n{self.repository.total_sessions()}  Total Streaming Sessions")
+        self.twitch_card.value_label.setText("Preview Mode" if self.repository.get_setting("development_bot", False) else "Not Connected")
+        self.obs_card.value_label.setText("Not Connected")
         self.overlay_card.value_label.setText("Live" if self.overlay_server.running else "Offline")
         self.session_card.value_label.setText("Live" if self.overlay_server.running else "Offline")
         preview = "<h2>📚 STUDY BUDY</h2>"
@@ -202,9 +209,14 @@ class StudyBudyWindow(QMainWindow):
 
     def start_overlay(self) -> None:
         try: self.overlay_server.start()
-        except OverlayServerError as exc: return self.error(str(exc))
-        self.refresh_dashboard()
-    def stop_overlay(self) -> None: self.overlay_server.stop(); self.refresh_dashboard()
+        except OverlayServerError:
+            try:
+                self.overlay_server.port = choose_available_port(self.overlay_server.host, self.overlay_server.port + 1)
+                self.repository.set_setting("overlay_port", self.overlay_server.port)
+                self.overlay_server.start()
+            except OverlayServerError as exc: return self.error(str(exc))
+        self.repository.start_session(); self.refresh_dashboard()
+    def stop_overlay(self) -> None: self.overlay_server.stop(); self.repository.end_session(); self.refresh_dashboard()
     def restart_overlay(self) -> None:
         try: self.overlay_server.restart()
         except OverlayServerError as exc: return self.error(str(exc))
@@ -218,11 +230,19 @@ class StudyBudyWindow(QMainWindow):
         if ok and channel.strip(): self.repository.set_setting("twitch_channel", channel.strip().lstrip("#")); self.refresh_connections()
     def refresh_connections(self) -> None:
         channel = self.repository.get_setting("twitch_channel", "")
-        self.twitch_status.setText(f"Twitch channel: {channel}" if channel else "Twitch: Not configured. Configure a channel to prepare chat connection.")
+        dev_bot = self.repository.get_setting("development_bot", False)
+        if dev_bot:
+            self.twitch_status.setText(f"Development Mode — simulated bot: {self.repository.get_setting('preview_bot_name', 'killer_queens_jester')}")
+        else:
+            self.twitch_status.setText(f"Twitch channel: {channel} — authorization required" if channel else "Twitch: Not Connected. Configure a channel, then authorize Twitch OAuth.")
+    def enable_development_bot(self) -> None:
+        self.repository.set_setting("development_bot", True); self.repository.set_setting("preview_bot_name", "killer_queens_jester"); self.refresh_connections()
+    def disconnect_twitch(self) -> None:
+        self.repository.set_setting("development_bot", False); self.refresh_connections()
     def load_appearance(self) -> None:
-        appearance = {**DEFAULT_APPEARANCE, **self.repository.get_setting("appearance", {})}; self.layout_mode.setCurrentIndex(self.layout_mode.findData(appearance["layout_mode"])); self.cycle_seconds.setValue(appearance["cycle_seconds"]); self.font_name.setText(appearance["font_family"]); self.text_color.setText(appearance["text_color"]); self.background_color.setText(appearance["background_color"]); self.opacity.setValue(appearance["background_opacity"])
+        appearance = {**DEFAULT_APPEARANCE, **self.repository.get_setting("appearance", {})}; self.layout_mode.setCurrentIndex(self.layout_mode.findData(appearance["layout_mode"])); self.cycle_seconds.setValue(appearance["cycle_seconds"]); self.font_name.setText(appearance["font_family"]); self.text_color.setText(appearance["text_color"]); self.background_color.setText(appearance["background_color"]); self.opacity.setValue(appearance["background_opacity"]); self.show_finished.setChecked(appearance["show_completed"])
     def save_appearance(self) -> None:
-        current = {**DEFAULT_APPEARANCE, **self.repository.get_setting("appearance", {})}; current.update({"layout_mode": self.layout_mode.currentData(), "cycle_seconds": self.cycle_seconds.value(), "font_family": self.font_name.text().strip() or "Segoe UI", "text_color": self.text_color.text().strip() or "#ffffff", "background_color": self.background_color.text().strip() or "#000000", "background_opacity": self.opacity.value()}); self.repository.set_setting("appearance", current); self.restart_overlay() if self.overlay_server.running else self.refresh_dashboard()
+        current = {**DEFAULT_APPEARANCE, **self.repository.get_setting("appearance", {})}; current.update({"layout_mode": self.layout_mode.currentData(), "cycle_seconds": self.cycle_seconds.value(), "font_family": self.font_name.text().strip() or "Comic Sans MS", "text_color": self.text_color.text().strip() or "#ffffff", "background_color": self.background_color.text().strip() or "#000000", "background_opacity": self.opacity.value(), "show_completed": self.show_finished.isChecked()}); self.repository.set_setting("appearance", current); self.restart_overlay() if self.overlay_server.running else self.refresh_dashboard()
     def export_tasks(self) -> None:
         path, _ = QFileDialog.getSaveFileName(self, "Export tasks", "study-budy-tasks.json", "JSON files (*.json)")
         if path: self.repository.export_json(path)
@@ -234,6 +254,10 @@ class StudyBudyWindow(QMainWindow):
         self.refresh_all(); QMessageBox.information(self, "Import complete", f"Imported {count} tasks.")
     def add_test_task(self) -> None:
         self.repository.add_task("Test viewer", "Try the Study Budy overlay"); self.refresh_all()
+    def open_task_window(self) -> None:
+        if self.task_window is None:
+            self.task_window = TaskWindow(self.repository)
+        self.task_window.refresh(); self.task_window.show(); self.task_window.raise_(); self.task_window.activateWindow()
     def open_data_folder(self) -> None: QDesktopServices.openUrl(QUrl.fromLocalFile(str(prepare_user_data_dir())))
     def open_logs_folder(self) -> None: QDesktopServices.openUrl(QUrl.fromLocalFile(str(prepare_user_data_dir() / "logs")))
     def reset_window(self) -> None: self.resize(1180, 760); self.move(80, 80)
@@ -242,14 +266,16 @@ class StudyBudyWindow(QMainWindow):
         self.settings.setValue("window/geometry", self.saveGeometry()); self.overlay_server.stop(); super().closeEvent(event)
 
 
-def run_desktop() -> int:
+def run_desktop(preview: bool = False) -> int:
     data_dir = prepare_user_data_dir(); logging.basicConfig(filename=data_dir / "logs" / "study-budy.log", level=logging.INFO)
     repository = TaskRepository(data_dir / "study-budy.db"); repository.initialize()
     repository.migrate_legacy_json(Path.cwd() / "data" / "tasks.json")
+    if preview:
+        seed_preview_data(repository)
     server = OverlayServer(repository, port=repository.get_setting("overlay_port", 5155))
     app = QApplication([]); app.setApplicationName("Study Budy")
     app.setStyleSheet("""
-        QMainWindow, QWidget { background: #11151a; color: #f1eff6; font-family: 'Segoe UI'; font-size: 14px; }
+        QMainWindow, QWidget { background: #11151a; color: #f1eff6; font-family: 'Poppins', 'Segoe UI', sans-serif; font-size: 14px; }
         QMenuBar { background: #15191f; border-bottom: 1px solid #2d333d; padding: 4px; }
         QMenuBar::item { padding: 6px 12px; } QMenuBar::item:selected, QMenu { background: #252035; }
         QFrame#card { background: #191e25; border: 1px solid #303742; border-radius: 9px; padding: 8px; }

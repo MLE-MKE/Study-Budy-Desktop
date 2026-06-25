@@ -19,7 +19,7 @@ Study Budy is a Windows-first desktop task manager for Twitch study, coworking, 
 Study Budy requires Python 3.11 or newer. See [Windows build instructions](docs/WINDOWS-BUILD.md).
 
 ```powershell
-py -3.11 -m venv .venv
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 python -m study_budy.main

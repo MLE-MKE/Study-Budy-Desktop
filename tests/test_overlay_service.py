@@ -1,5 +1,5 @@
 from study_budy.overlay_service import create_overlay_app
-from study_budy.server import OverlayServer, OverlayServerError
+from study_budy.server import OverlayServer, OverlayServerError, choose_available_port
 from study_budy.storage import TaskRepository
 
 
@@ -28,5 +28,16 @@ def test_overlay_reports_port_conflict(tmp_path):
             pass
         else:
             raise AssertionError("Expected an overlay port conflict")
+    finally:
+        first.stop()
+
+
+def test_port_choice_moves_on_when_preferred_port_is_busy(tmp_path):
+    repository = TaskRepository(tmp_path / "tasks.db")
+    repository.initialize()
+    first = OverlayServer(repository, port=5168)
+    first.start()
+    try:
+        assert choose_available_port("127.0.0.1", 5168) != 5168
     finally:
         first.stop()

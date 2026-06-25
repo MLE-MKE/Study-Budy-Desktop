@@ -8,7 +8,7 @@ from .storage import TaskRepository
 
 DEFAULT_APPEARANCE = {
     "layout_mode": "cycle", "cycle_seconds": 15, "show_completed": False,
-    "hide_empty": True, "font_family": "Segoe UI", "participant_font_size": 26,
+    "hide_empty": True, "font_family": "Comic Sans MS", "participant_font_size": 26,
     "task_font_size": 18, "text_color": "#ffffff", "completed_text_color": "#a9a9a9",
     "background_color": "#000000", "background_opacity": 60, "card_color": "#1f1830",
     "card_opacity": 85, "border_color": "#9f7aea", "border_radius": 12, "padding": 20,

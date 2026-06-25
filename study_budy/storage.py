@@ -53,6 +53,7 @@ class TaskRepository:
                     id TEXT PRIMARY KEY,
                     display_name TEXT NOT NULL,
                     normalized_name TEXT NOT NULL UNIQUE,
+                    twitch_user_id TEXT,
                     participant_type TEXT NOT NULL DEFAULT 'viewer',
                     is_active INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL,
@@ -83,6 +84,12 @@ class TaskRepository:
                 );
                 """
             )
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)")}
+            if "archived_at" not in columns:
+                conn.execute("ALTER TABLE tasks ADD COLUMN archived_at TEXT")
+            participant_columns = {row["name"] for row in conn.execute("PRAGMA table_info(participants)")}
+            if "twitch_user_id" not in participant_columns:
+                conn.execute("ALTER TABLE participants ADD COLUMN twitch_user_id TEXT")
 
     @staticmethod
     def validate_task_text(text: str) -> str:
@@ -104,7 +111,7 @@ class TaskRepository:
         return task
 
     def get_or_create_participant(
-        self, display_name: str, participant_type: str = "viewer"
+        self, display_name: str, participant_type: str = "viewer", twitch_user_id: str | None = None
     ) -> dict[str, Any]:
         name = " ".join(display_name.split())
         if not name or len(name) > 80:
@@ -116,8 +123,8 @@ class TaskRepository:
             ).fetchone()
             if row:
                 conn.execute(
-                    "UPDATE participants SET display_name=?, is_active=1, updated_at=? WHERE id=?",
-                    (name, now(), row["id"]),
+                    "UPDATE participants SET display_name=?, twitch_user_id=COALESCE(?, twitch_user_id), is_active=1, updated_at=? WHERE id=?",
+                    (name, twitch_user_id, now(), row["id"]),
                 )
                 row = conn.execute("SELECT * FROM participants WHERE id=?", (row["id"],)).fetchone()
                 return self._participant(row)
@@ -125,9 +132,9 @@ class TaskRepository:
             timestamp = now()
             conn.execute(
                 """INSERT INTO participants
-                (id, display_name, normalized_name, participant_type, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)""",
-                (participant_id, name, normalized, participant_type, timestamp, timestamp),
+                (id, display_name, normalized_name, twitch_user_id, participant_type, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (participant_id, name, normalized, twitch_user_id, participant_type, timestamp, timestamp),
             )
             return self._participant(conn.execute("SELECT * FROM participants WHERE id=?", (participant_id,)).fetchone())
 
@@ -151,7 +158,7 @@ class TaskRepository:
         query = """
             SELECT p.*, SUM(CASE WHEN t.is_complete=0 THEN 1 ELSE 0 END) AS incomplete_count,
                    SUM(CASE WHEN t.is_complete=1 THEN 1 ELSE 0 END) AS complete_count
-            FROM participants p LEFT JOIN tasks t ON t.participant_id=p.id
+            FROM participants p LEFT JOIN tasks t ON t.participant_id=p.id AND t.archived_at IS NULL
         """
         if not include_inactive:
             query += " WHERE p.is_active=1"
@@ -159,7 +166,7 @@ class TaskRepository:
         with self.connection() as conn:
             return [dict(row) for row in conn.execute(query)]
 
-    def list_tasks(self, participant_id: str | None = None, include_completed: bool = True) -> list[dict[str, Any]]:
+    def list_tasks(self, participant_id: str | None = None, include_completed: bool = True, include_archived: bool = False) -> list[dict[str, Any]]:
         query = "SELECT * FROM tasks"
         clauses, args = [], []
         if participant_id:
@@ -167,15 +174,17 @@ class TaskRepository:
             args.append(participant_id)
         if not include_completed:
             clauses.append("is_complete=0")
+        if not include_archived:
+            clauses.append("archived_at IS NULL")
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY participant_id, position"
         with self.connection() as conn:
             return [self._task(row) for row in conn.execute(query, args)]
 
-    def task_snapshot(self, include_completed: bool = True) -> list[dict[str, Any]]:
+    def task_snapshot(self, include_completed: bool = True, include_archived: bool = False) -> list[dict[str, Any]]:
         participants = self.list_participants()
-        tasks = self.list_tasks(include_completed=include_completed)
+        tasks = self.list_tasks(include_completed=include_completed, include_archived=include_archived)
         by_participant: dict[str, list[dict[str, Any]]] = {}
         for task in tasks:
             by_participant.setdefault(task["participant_id"], []).append(task)
@@ -193,13 +202,54 @@ class TaskRepository:
 
     def set_task_complete(self, task_id: str, complete: bool) -> dict[str, Any]:
         with self.connection() as conn:
+            previous = conn.execute("SELECT is_complete FROM tasks WHERE id=?", (task_id,)).fetchone()
+            if not previous:
+                raise KeyError("Task not found.")
             result = conn.execute(
                 "UPDATE tasks SET is_complete=?, completed_at=?, updated_at=? WHERE id=?",
                 (int(complete), now() if complete else None, now(), task_id),
             )
             if not result.rowcount:
                 raise KeyError("Task not found.")
+            if complete and not previous["is_complete"]:
+                row = conn.execute("SELECT value_json FROM settings WHERE key='lifetime_completed'").fetchone()
+                total = (json.loads(row["value_json"]) if row else 0) + 1
+                conn.execute(
+                    "INSERT INTO settings(key, value_json, updated_at) VALUES ('lifetime_completed', ?, ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at",
+                    (json.dumps(total), now()),
+                )
             return self._task(conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone())
+
+    def archive_task(self, task_id: str) -> None:
+        with self.connection() as conn:
+            if not conn.execute("UPDATE tasks SET archived_at=?, updated_at=? WHERE id=?", (now(), now(), task_id)).rowcount:
+                raise KeyError("Task not found.")
+
+    def archive_completed(self, participant_id: str | None = None) -> int:
+        with self.connection() as conn:
+            query, args = "UPDATE tasks SET archived_at=?, updated_at=? WHERE is_complete=1 AND archived_at IS NULL", [now(), now()]
+            if participant_id:
+                query += " AND participant_id=?"
+                args.append(participant_id)
+            return conn.execute(query, args).rowcount
+
+    def lifetime_completed(self) -> int:
+        return int(self.get_setting("lifetime_completed", 0))
+
+    def start_session(self) -> None:
+        with self.connection() as conn:
+            active = conn.execute("SELECT id FROM sessions WHERE status='live' LIMIT 1").fetchone()
+            if not active:
+                conn.execute("INSERT INTO sessions(id, started_at, status) VALUES (?, ?, 'live')", (str(uuid4()), now()))
+
+    def end_session(self) -> None:
+        with self.connection() as conn:
+            conn.execute("UPDATE sessions SET status='ended', ended_at=? WHERE status='live'", (now(),))
+
+    def total_sessions(self) -> int:
+        with self.connection() as conn:
+            return conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
 
     def delete_task(self, task_id: str) -> None:
         with self.connection() as conn:
