@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
+    QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -27,7 +28,7 @@ class AppearancePanel(QFrame):
         self.repository = repository
         self.on_save = on_save
         self.setObjectName("Card")
-        self.setMinimumHeight(620)
+        self.setMinimumHeight(560)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(Theme.CARD_PADDING, Theme.CARD_PADDING, Theme.CARD_PADDING, Theme.CARD_PADDING)
         layout.setSpacing(12)
@@ -35,8 +36,11 @@ class AppearancePanel(QFrame):
         title.setObjectName("H2")
         layout.addWidget(title)
 
-        form = QVBoxLayout()
-        form.setSpacing(6)
+        form = QFormLayout()
+        form.setVerticalSpacing(8)
+        form.setHorizontalSpacing(10)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self.task_list_title = QLineEdit()
         self.title_icon = QComboBox()
         self.title_icon.addItem("Book", "book")
@@ -73,13 +77,11 @@ class AppearancePanel(QFrame):
             ("Corner radius", self.corner_radius),
             ("Finished tasks", self.show_finished),
         ):
-            label_widget = QLabel(label)
-            label_widget.setObjectName("SmallNote")
-            form.addWidget(label_widget)
-            form.addWidget(field)
+            field.setMinimumWidth(150)
+            form.addRow(label, field)
         layout.addLayout(form)
 
-        buttons = QVBoxLayout()
+        buttons = QHBoxLayout()
         upload = QPushButton("Upload Image")
         upload.setIcon(icon("upload"))
         upload.clicked.connect(self.choose_image)

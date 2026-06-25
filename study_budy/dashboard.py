@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
+    QBoxLayout,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -30,34 +31,39 @@ class DashboardView(QWidget):
         self.repository = repository
         self.overlay_server = overlay_server
         self.callbacks = callbacks
+        self.stack_right = False
+        self.central_compact = False
+        self.lower_stack = False
 
-        root = QHBoxLayout(self)
-        root.setContentsMargins(12, 18, 12, 18)
-        root.setSpacing(Theme.SECTION_SPACING)
+        self.root = QBoxLayout(QBoxLayout.Direction.LeftToRight, self)
+        self.root.setContentsMargins(18, 22, 18, 22)
+        self.root.setSpacing(Theme.SECTION_SPACING)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.main_scroll = QScrollArea()
+        self.main_scroll.setWidgetResizable(True)
+        self.main_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         main_wrap = QWidget()
         self.main = QVBoxLayout(main_wrap)
         self.main.setSpacing(Theme.SECTION_SPACING)
         self.main.setContentsMargins(0, 0, 0, 0)
-        scroll.setWidget(main_wrap)
-        root.addWidget(scroll, 1)
+        self.main_scroll.setWidget(main_wrap)
+        self.root.addWidget(self.main_scroll, 1)
 
-        right_scroll = QScrollArea()
-        right_scroll.setWidgetResizable(True)
-        right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        right_scroll.setFixedWidth(Theme.RIGHT_PANEL_WIDTH)
+        self.right_scroll = QScrollArea()
+        self.right_scroll.setWidgetResizable(True)
+        self.right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.right_scroll.setMinimumWidth(Theme.RIGHT_PANEL_MIN_WIDTH)
+        self.right_scroll.setFixedWidth(Theme.RIGHT_PANEL_WIDTH)
         right = QWidget()
         self.right_column = QVBoxLayout(right)
         self.right_column.setContentsMargins(0, 0, 0, 0)
         self.right_column.setSpacing(Theme.SECTION_SPACING)
-        right_scroll.setWidget(right)
-        root.addWidget(right_scroll)
+        self.right_scroll.setWidget(right)
+        self.root.addWidget(self.right_scroll)
 
         self._build_main()
         self._build_right()
+        self.apply_responsive_layout(False, False, False)
 
     def _build_main(self) -> None:
         header = QHBoxLayout()
@@ -77,17 +83,15 @@ class DashboardView(QWidget):
         header.addWidget(help_button)
         self.main.addLayout(header)
 
-        card_grid = QGridLayout()
-        card_grid.setHorizontalSpacing(Theme.SECTION_SPACING)
+        self.card_grid = QGridLayout()
+        self.card_grid.setHorizontalSpacing(Theme.SECTION_SPACING)
+        self.card_grid.setVerticalSpacing(Theme.SECTION_SPACING)
         self.twitch_card = StatusCard("Twitch", "twitch")
         self.obs_card = StatusCard("OBS", "obs")
         self.overlay_card = StatusCard("Overlay Server", "server")
         self.session_card = StatusCard("Session Status", "session")
-        for index, card in enumerate((self.twitch_card, self.obs_card, self.overlay_card, self.session_card)):
-            row, column = divmod(index, 2)
-            card_grid.addWidget(card, row, column)
-            card_grid.setColumnStretch(column, 1)
-        self.main.addLayout(card_grid)
+        self.status_cards = [self.twitch_card, self.obs_card, self.overlay_card, self.session_card]
+        self.main.addLayout(self.card_grid)
 
         url_card = self._card()
         url_box = QVBoxLayout(url_card)
@@ -95,13 +99,12 @@ class DashboardView(QWidget):
         title = QLabel("Overlay URL")
         title.setObjectName("H2")
         url_box.addWidget(title)
-        row = QVBoxLayout()
-        row.setSpacing(8)
+        self.url_grid = QGridLayout()
+        self.url_grid.setHorizontalSpacing(8)
+        self.url_grid.setVerticalSpacing(8)
         self.overlay_url = QLineEdit()
         self.overlay_url.setReadOnly(True)
-        row.addWidget(self.overlay_url)
-        button_row = QHBoxLayout()
-        button_row.setSpacing(8)
+        self.url_buttons: list[QPushButton] = []
         for label, icon_name, callback, primary in (
             ("Copy URL", "copy", self.callbacks["copy_url"], True),
             ("Preview Overlay", "preview", self.callbacks["preview"], False),
@@ -112,20 +115,20 @@ class DashboardView(QWidget):
             if primary:
                 button.setObjectName("PrimaryButton")
             button.clicked.connect(callback)
-            button_row.addWidget(button)
-        row.addLayout(button_row)
-        url_box.addLayout(row)
+            self.url_buttons.append(button)
+        url_box.addLayout(self.url_grid)
         self.main.addWidget(url_card)
 
-        two_cards = QVBoxLayout()
-        two_cards.setSpacing(Theme.SECTION_SPACING)
-        two_cards.addWidget(self._obs_steps_card(), 1)
-        two_cards.addWidget(self._controls_card(), 1)
-        self.main.addLayout(two_cards)
+        self.two_cards = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self.two_cards.setSpacing(Theme.SECTION_SPACING)
+        self.two_cards.addWidget(self._obs_steps_card(), 1)
+        self.two_cards.addWidget(self._controls_card(), 1)
+        self.main.addLayout(self.two_cards)
 
         self.stats_card = self._stats_card()
         self.main.addWidget(self.stats_card)
-        self.main.addWidget(self._viewer_window_card())
+        self.viewer_card = self._viewer_window_card()
+        self.main.addWidget(self.viewer_card)
         self.main.addStretch(1)
 
     def _build_right(self) -> None:
@@ -170,6 +173,7 @@ class DashboardView(QWidget):
             ("Restart", "refresh", self.callbacks["restart"], False),
         ):
             button = QPushButton(label)
+            button.setMinimumWidth(72)
             button.setIcon(icon(icon_name))
             button.setIconSize(QSize(22, 22))
             button.clicked.connect(callback)
@@ -212,16 +216,16 @@ class DashboardView(QWidget):
     def _viewer_window_card(self) -> QFrame:
         card = QFrame()
         card.setObjectName("HeroCard")
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 18, 20, 18)
-        layout.setSpacing(12)
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(24, 22, 24, 22)
+        layout.setSpacing(22)
         logo = QLabel()
-        logo.setPixmap(icon("window").pixmap(74, 74))
+        logo.setPixmap(icon("window").pixmap(92, 92))
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(logo)
         text = QVBoxLayout()
         heading = QLabel("Viewer Task Window")
-        heading.setObjectName("H2")
+        heading.setObjectName("H1")
         body = QLabel("Open viewer task lists in a separate window.")
         body.setObjectName("H2")
         description = QLabel("Viewers can see their personalized tasks, submit completions, and track progress in real time.")
@@ -244,8 +248,62 @@ class DashboardView(QWidget):
         note = QLabel("ⓘ  You can also open this window from the Tasks menu.")
         note.setObjectName("SmallNote")
         text.addWidget(note)
-        layout.addLayout(text)
+        layout.addLayout(text, 1)
         return card
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        stack_right = self.width() < Theme.PAGE_RESPONSIVE_BREAKPOINT
+        central_width = self.main_scroll.viewport().width()
+        self.apply_responsive_layout(stack_right, central_width < 700, central_width < 700)
+
+    def apply_responsive_layout(self, stack_right: bool, central_compact: bool, lower_stack: bool) -> None:
+        if (
+            stack_right == self.stack_right
+            and central_compact == self.central_compact
+            and lower_stack == self.lower_stack
+            and self.card_grid.count()
+        ):
+            return
+        self.stack_right = stack_right
+        self.central_compact = central_compact
+        self.lower_stack = lower_stack
+        self.root.setDirection(QBoxLayout.Direction.TopToBottom if stack_right else QBoxLayout.Direction.LeftToRight)
+        if stack_right:
+            self.right_scroll.setMinimumWidth(0)
+            self.right_scroll.setMaximumWidth(16777215)
+        else:
+            self.right_scroll.setFixedWidth(Theme.RIGHT_PANEL_WIDTH)
+        self.two_cards.setDirection(QBoxLayout.Direction.TopToBottom if lower_stack else QBoxLayout.Direction.LeftToRight)
+        self._layout_url(central_compact)
+        while self.card_grid.count():
+            item = self.card_grid.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+        columns = 2 if central_compact else 4
+        for index, card in enumerate(self.status_cards):
+            row, column = divmod(index, columns)
+            self.card_grid.addWidget(card, row, column)
+        for column in range(4):
+            self.card_grid.setColumnStretch(column, 1 if column < columns else 0)
+
+    def _layout_url(self, central_compact: bool) -> None:
+        while self.url_grid.count():
+            self.url_grid.takeAt(0)
+        if central_compact:
+            for column in range(4):
+                self.url_grid.setColumnStretch(column, 0)
+            self.url_grid.addWidget(self.overlay_url, 0, 0, 1, 3)
+            for column, button in enumerate(self.url_buttons):
+                self.url_grid.addWidget(button, 1, column)
+                self.url_grid.setColumnStretch(column, 1)
+        else:
+            for column in range(4):
+                self.url_grid.setColumnStretch(column, 0)
+            self.url_grid.addWidget(self.overlay_url, 0, 0)
+            for column, button in enumerate(self.url_buttons, start=1):
+                self.url_grid.addWidget(button, 0, column)
+            self.url_grid.setColumnStretch(0, 1)
 
     @staticmethod
     def _card() -> QFrame:

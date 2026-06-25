@@ -7,7 +7,7 @@ import webbrowser
 from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt, QUrl
-from PySide6.QtGui import QDesktopServices, QIcon, QPixmap
+from PySide6.QtGui import QDesktopServices, QGuiApplication, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -24,6 +24,8 @@ from PySide6.QtWidgets import (
 )
 
 from .appearance_panel import AppearancePanel
+from .checkin import CheckInService
+from .checkin_view import CheckInView
 from .connections_view import ConnectionsView
 from .dashboard import DashboardView
 from .icons import LOGO_PATH, icon
@@ -44,6 +46,7 @@ class StudyBudyWindow(QMainWindow):
         super().__init__()
         self.repository = repository
         self.overlay_server = overlay_server
+        self.checkins = CheckInService(repository)
         self.settings = QSettings("Hotkey LLC", "Study Budy")
         self.task_window: TaskWindow | None = None
         self.setWindowTitle("Study Budy Desktop")
@@ -52,6 +55,8 @@ class StudyBudyWindow(QMainWindow):
         self.resize(Theme.DEFAULT_WINDOW_WIDTH, Theme.DEFAULT_WINDOW_HEIGHT)
         if geometry := self.settings.value("window/geometry", b""):
             self.restoreGeometry(geometry)
+        else:
+            self.center_window()
 
         self._build_menu()
         self._build_shell()
@@ -68,7 +73,7 @@ class StudyBudyWindow(QMainWindow):
         file_menu.addAction("Exit", self.close)
 
         view_menu = self.menuBar().addMenu("&View")
-        for index, name in enumerate(("Dashboard", "Tasks", "Connections", "Appearance", "Help")):
+        for index, name in enumerate(("Dashboard", "Tasks", "Connections", "Appearance", "Check In", "Help")):
             view_menu.addAction(name, self.open_task_window if name == "Tasks" else lambda checked=False, page=index: self.go_to_page(page))
         view_menu.addAction("Refresh overlay", self.restart_overlay)
         view_menu.addAction("Reset window layout", self.reset_window)
@@ -76,15 +81,15 @@ class StudyBudyWindow(QMainWindow):
         settings_menu = self.menuBar().addMenu("&Settings")
         settings_menu.addAction("General settings", lambda: self.go_to_page(0))
         settings_menu.addAction("Twitch settings", lambda: self.go_to_page(2))
-        settings_menu.addAction("OBS and Streamlabs settings", lambda: self.go_to_page(4))
+        settings_menu.addAction("OBS and Streamlabs settings", lambda: self.go_to_page(5))
         settings_menu.addAction("Storage settings", self.open_data_folder)
         settings_menu.addAction("Appearance settings", lambda: self.go_to_page(3))
 
         help_menu = self.menuBar().addMenu("&Help")
-        help_menu.addAction("Setup instructions", lambda: self.go_to_page(4))
-        help_menu.addAction("OBS setup instructions", lambda: self.go_to_page(4))
-        help_menu.addAction("Streamlabs setup instructions", lambda: self.go_to_page(4))
-        help_menu.addAction("Twitch command instructions", lambda: self.go_to_page(4))
+        help_menu.addAction("Setup instructions", lambda: self.go_to_page(5))
+        help_menu.addAction("OBS setup instructions", lambda: self.go_to_page(5))
+        help_menu.addAction("Streamlabs setup instructions", lambda: self.go_to_page(5))
+        help_menu.addAction("Twitch command instructions", lambda: self.go_to_page(5))
         help_menu.addAction("Contact support", lambda: QDesktopServices.openUrl(QUrl("mailto:hotkeyllc@outlook.com?subject=Study%20Budy%20Support%20Request")))
         help_menu.addAction("Open logs folder", self.open_logs_folder)
         help_menu.addAction("About Study Budy", self.about_study_budy)
@@ -109,11 +114,12 @@ class StudyBudyWindow(QMainWindow):
             "preview": self.open_preview,
             "task_window": self.open_task_window,
             "appearance": lambda: self.go_to_page(3),
-            "help": lambda: self.go_to_page(4),
+            "help": lambda: self.go_to_page(5),
             "appearance_saved": self.appearance_saved,
         }
         self.dashboard = DashboardView(self.repository, self.overlay_server, callbacks)
         self.connections = ConnectionsView(self.repository, self.refresh_all)
+        self.checkin_page = CheckInView(self.repository, self.overlay_server, callbacks)
         self.appearance_page = self._appearance_page()
         self.help_page = self._help_page()
 
@@ -121,6 +127,7 @@ class StudyBudyWindow(QMainWindow):
         self.pages.addWidget(self._tasks_page())
         self.pages.addWidget(self.connections)
         self.pages.addWidget(self.appearance_page)
+        self.pages.addWidget(self.checkin_page)
         self.pages.addWidget(self.help_page)
         self.pages.currentChanged.connect(self.sidebar.set_active)
 
@@ -213,6 +220,7 @@ class StudyBudyWindow(QMainWindow):
     def refresh_all(self) -> None:
         self.dashboard.refresh()
         self.connections.refresh()
+        self.checkin_page.refresh()
         self.full_overlay_preview.refresh()
         self.full_appearance_panel.load()
         live = self.overlay_server.running
@@ -234,6 +242,7 @@ class StudyBudyWindow(QMainWindow):
     def stop_overlay(self) -> None:
         self.overlay_server.stop()
         self.repository.end_session()
+        self.checkins.reset_for_session_end()
         self.refresh_all()
 
     def restart_overlay(self) -> None:
@@ -296,7 +305,17 @@ class StudyBudyWindow(QMainWindow):
 
     def reset_window(self) -> None:
         self.resize(Theme.DEFAULT_WINDOW_WIDTH, Theme.DEFAULT_WINDOW_HEIGHT)
-        self.move(60, 40)
+        self.center_window()
+
+    def center_window(self) -> None:
+        screen = QGuiApplication.primaryScreen()
+        if not screen:
+            return
+        available = screen.availableGeometry()
+        self.move(
+            available.x() + (available.width() - self.width()) // 2,
+            available.y() + (available.height() - self.height()) // 2,
+        )
 
     def error(self, message: str) -> None:
         QMessageBox.warning(self, "Study Budy", message)

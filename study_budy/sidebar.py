@@ -20,17 +20,17 @@ class Sidebar(QFrame):
         self.buttons: list[QPushButton] = []
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 18, 10, 16)
-        layout.setSpacing(9)
+        layout.setContentsMargins(12, 18, 12, 16)
+        layout.setSpacing(10)
 
         logo = QLabel()
-        logo.setPixmap(QPixmap(str(LOGO_PATH)).scaled(86, 86, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        logo.setPixmap(QPixmap(str(LOGO_PATH)).scaled(92, 92, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(logo)
 
         brand = QLabel("STUDY BUDY\nDESKTOP")
         brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        brand.setStyleSheet("font-weight: 900; font-size: 15px; letter-spacing: 2px;")
+        brand.setStyleSheet("font-weight: 900; font-size: 17px; letter-spacing: 2px;")
         layout.addWidget(brand)
         layout.addSpacing(18)
 
@@ -39,6 +39,7 @@ class Sidebar(QFrame):
             ("Tasks", "tasks"),
             ("Connections", "connections"),
             ("Appearance", "appearance"),
+            ("Check In", "check"),
             ("Help", "help"),
         ]
         for index, (label, icon_name) in enumerate(rows):
@@ -46,7 +47,9 @@ class Sidebar(QFrame):
             button.setObjectName("NavButton")
             button.setIcon(icon(icon_name))
             button.setIconSize(QSize(24, 24))
-            button.clicked.connect(lambda checked=False, page=index: self.navigate.emit(page))
+            page = 5 if label == "Help" else index
+            button.setProperty("pageIndex", page)
+            button.clicked.connect(lambda checked=False, page=page: self.navigate.emit(page))
             layout.addWidget(button)
             self.buttons.append(button)
 
@@ -60,8 +63,8 @@ class Sidebar(QFrame):
         self.set_active(0)
 
     def set_active(self, index: int) -> None:
-        for button_index, button in enumerate(self.buttons):
-            button.setProperty("active", button_index == index)
+        for button in self.buttons:
+            button.setProperty("active", button.property("pageIndex") == index and button.isEnabled())
             button.style().unpolish(button)
             button.style().polish(button)
 

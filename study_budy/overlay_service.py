@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from flask import Flask, jsonify, render_template
+from pathlib import Path
 
+from flask import Flask, jsonify, render_template, send_from_directory
+
+from .checkin import CheckInService
 from .storage import TaskRepository
 
 DEFAULT_APPEARANCE = {
@@ -18,6 +21,8 @@ DEFAULT_APPEARANCE = {
 
 def create_overlay_app(repository: TaskRepository) -> Flask:
     app = Flask(__name__, template_folder="templates")
+    checkins = CheckInService(repository)
+    overlay_dir = Path(__file__).with_name("overlay")
 
     @app.get("/health")
     def health():
@@ -31,8 +36,20 @@ def create_overlay_app(repository: TaskRepository) -> Flask:
             participants = [item for item in participants if item["tasks"]]
         return jsonify({"participants": participants, "appearance": appearance})
 
+    @app.get("/api/checkin")
+    def checkin_data():
+        return jsonify(checkins.snapshot())
+
     @app.get("/overlay")
     def overlay():
         return render_template("overlay.html")
+
+    @app.get("/checkin")
+    def checkin():
+        return send_from_directory(overlay_dir, "checkin.html")
+
+    @app.get("/checkin/<path:filename>")
+    def checkin_asset(filename: str):
+        return send_from_directory(overlay_dir, filename)
 
     return app
