@@ -23,6 +23,9 @@ DEFAULT_CHECKIN_APPEARANCE = {
     "browser_height": 720,
     "overlay_padding": 48,
     "viewer_spacing": 34,
+    "vertical_spacing": 70,
+    "arrangement_mode": "Around Streamer",
+    "max_visible_viewers": 24,
     "viewer_shape_size": 72,
     "streamer_shape_size": 88,
     "outline_color": "#1b0b45",
@@ -41,7 +44,12 @@ DEFAULT_CHECKIN_APPEARANCE = {
     "join_animation": "pop",
     "idle_animation": "bounce",
     "leave_animation": "black_portal",
+    "completion_animation": "Celebrate",
+    "animation_speed": 100,
     "reduced_motion": False,
+    "show_streamer": True,
+    "show_speech_bubbles": True,
+    "enable_reactions": True,
     "restore_active_after_restart": False,
 }
 

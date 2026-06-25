@@ -182,6 +182,31 @@ def app_stylesheet() -> str:
     QCheckBox {{
         spacing: 8px;
     }}
+    QTabWidget::pane {{
+        border: 1px solid {Theme.BORDER};
+        border-radius: {Theme.RADIUS}px;
+        top: -1px;
+        background: {Theme.BACKGROUND};
+    }}
+    QTabBar::tab {{
+        background: {Theme.PANEL};
+        color: {Theme.TEXT_MUTED};
+        border: 1px solid {Theme.BORDER};
+        border-bottom-color: {Theme.BORDER};
+        padding: 9px 18px;
+        min-width: 86px;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+    }}
+    QTabBar::tab:selected {{
+        background: {Theme.PURPLE_DARK};
+        color: {Theme.TEXT};
+        border-color: {Theme.PURPLE};
+    }}
+    QTabBar::tab:hover {{
+        color: {Theme.TEXT};
+        border-color: {Theme.PURPLE};
+    }}
     QTreeWidget {{
         alternate-background-color: #151a21;
     }}
