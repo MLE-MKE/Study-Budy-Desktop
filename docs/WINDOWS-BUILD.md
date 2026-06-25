@@ -16,7 +16,7 @@ python -m study_budy.main
 ## Portable Windows build
 
 ```powershell
-python -m PyInstaller --noconfirm --windowed --name "Study Budy" --add-data "study_budy/templates;study_budy/templates" --add-data "study_budy/assets;study_budy/assets" -m study_budy.main
+python -m PyInstaller --noconfirm --windowed --name "Study Budy" --icon "study_budy/assets/study-budy-icon.ico" --add-data "study_budy/templates;study_budy/templates" --add-data "study_budy/assets;study_budy/assets" -m study_budy.main
 ```
 
 The portable build is created at `dist\Study Budy\Study Budy.exe`. The application stores its database, uploads, backups, and logs under `%LOCALAPPDATA%\Study Budy`, outside its installation folder.

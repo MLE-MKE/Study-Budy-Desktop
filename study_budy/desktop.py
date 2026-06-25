@@ -8,7 +8,7 @@ from html import escape
 from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt, QUrl
-from PySide6.QtGui import QDesktopServices, QIcon
+from PySide6.QtGui import QDesktopServices, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
     QFrame, QGridLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow, QMessageBox,
@@ -24,6 +24,8 @@ from .storage import TaskRepository, ValidationError
 from .task_window import TaskWindow
 
 LOG = logging.getLogger(__name__)
+ASSETS_DIR = Path(__file__).with_name("assets")
+APP_ICON_PATH = ASSETS_DIR / "study-budy-icon.png"
 
 
 class StudyBudyWindow(QMainWindow):
@@ -33,7 +35,7 @@ class StudyBudyWindow(QMainWindow):
         self.settings = QSettings("Hotkey LLC", "Study Budy")
         self.task_window: TaskWindow | None = None
         self.setWindowTitle("Study Budy Desktop")
-        self.setWindowIcon(QIcon(str(Path(__file__).with_name("assets") / "study-budy-icon.svg")))
+        self.setWindowIcon(QIcon(str(APP_ICON_PATH)))
         self.setMinimumSize(980, 640)
         self.resize(self.settings.value("window/size", self.size()))
         self._build_menu()
@@ -73,7 +75,13 @@ class StudyBudyWindow(QMainWindow):
     def _build_pages(self) -> None:
         central = QWidget(); layout = QHBoxLayout(central); layout.setContentsMargins(0, 0, 0, 0)
         rail = QFrame(); rail.setFixedWidth(180); rail_layout = QVBoxLayout(rail)
-        rail_layout.addWidget(QLabel("<h2>Study Budy</h2><p>STREAM TASK CONTROL</p>"))
+        logo = QLabel()
+        logo.setPixmap(QPixmap(str(APP_ICON_PATH)).scaled(86, 86, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        rail_layout.addWidget(logo)
+        title = QLabel("<h2>Study Budy</h2><p>STREAM TASK CONTROL</p>")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        rail_layout.addWidget(title)
         self.pages = QStackedWidget()
         for index, name in enumerate(("Dashboard", "Tasks", "Connections", "Appearance", "Help")):
             button = QPushButton(name); button.clicked.connect(self.open_task_window if name == "Tasks" else lambda checked=False, page=index: self.pages.setCurrentIndex(page)); rail_layout.addWidget(button)
