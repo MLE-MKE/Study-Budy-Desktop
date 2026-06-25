@@ -1,9 +1,112 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Study Budy Overlay</title><style>
-html,body{margin:0;background:transparent;color:white;font-family:"Segoe UI",sans-serif}#overlay{display:grid;gap:14px;width:min(560px,100vw)}.card{padding:var(--padding);border:1px solid var(--border);border-radius:var(--radius);background:var(--card)}h2{margin:0 0 12px;font-size:var(--name-size)}.task{margin-top:8px;font-size:var(--task-size);line-height:1.35}.done{color:var(--done);text-decoration:line-through;opacity:.8}
-</style></head><body><main id="overlay" aria-live="polite"></main><script>
-let index=0;const root=document.getElementById('overlay');const safeText=value=>document.createTextNode(String(value||''));
-function card(p){const a=document.createElement('article');a.className='card';const h=document.createElement('h2');h.append(safeText(p.display_name));a.append(h);p.tasks.forEach((t,n)=>{const i=document.createElement('div');i.className=`task${t.is_complete?' done':''}`;i.append(safeText(`${n+1}. ${t.text}`));a.append(i)});return a}
-function draw(data){const s=data.appearance;root.style.cssText=`--padding:${s.padding}px;--border:${s.border_color};--radius:${s.border_radius}px;--card:${s.card_color}${Math.round(s.card_opacity*2.55).toString(16).padStart(2,'0')};--name-size:${s.participant_font_size}px;--task-size:${s.task_font_size}px;--done:${s.completed_text_color};font-family:${s.font_family},sans-serif;color:${s.text_color};`;root.replaceChildren();const p=data.participants;if(!p.length){const m=document.createElement('div');m.className='card';m.append(safeText('Waiting for tasks…'));root.append(m);return}if(s.layout_mode==='streamer_top')p.forEach(x=>root.append(card(x)));else root.append(card(p[index++%p.length]))}
-async function refresh(){try{draw(await(await fetch('/api/overlay',{cache:'no-store'})).json())}catch{root.textContent='Study Budy overlay is reconnecting…'}}refresh();setInterval(refresh,3000);
-</script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Study Budy Overlay</title>
+  <style>
+    html, body {
+      margin: 0;
+      background: transparent;
+      color: white;
+      font-family: "Segoe UI", sans-serif;
+    }
+    #overlay {
+      display: grid;
+      gap: 14px;
+      width: min(560px, 100vw);
+    }
+    .card {
+      padding: var(--padding);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+    }
+    .overlay-title {
+      color: #bd75ff;
+      text-align: center;
+      font-size: var(--name-size);
+      font-weight: 800;
+      margin: 0 0 12px;
+    }
+    .person-title {
+      margin: 0 0 12px;
+      font-size: calc(var(--name-size) * .78);
+    }
+    .task {
+      margin-top: 8px;
+      font-size: var(--task-size);
+      line-height: 1.35;
+    }
+    .done {
+      color: var(--done);
+      text-decoration: line-through;
+      opacity: .8;
+    }
+  </style>
+</head>
+<body>
+<main id="overlay" aria-live="polite"></main>
+<script>
+let index = 0;
+const root = document.getElementById('overlay');
+const safeText = value => document.createTextNode(String(value || ''));
+const titleIcon = name => ({book: '▰', box: '▣', star: '☆', heart: '♡'}[name] || '▰');
+
+function titleCard(settings) {
+  const article = document.createElement('article');
+  article.className = 'card';
+  const title = document.createElement('div');
+  title.className = 'overlay-title';
+  title.append(safeText(`${titleIcon(settings.title_icon)} ${settings.task_list_title}`));
+  article.append(title);
+  return article;
+}
+
+function card(participant) {
+  const article = document.createElement('article');
+  article.className = 'card';
+  const heading = document.createElement('h2');
+  heading.className = 'person-title';
+  heading.append(safeText(participant.display_name));
+  article.append(heading);
+  participant.tasks.forEach((task, taskIndex) => {
+    const item = document.createElement('div');
+    item.className = `task${task.is_complete ? ' done' : ''}`;
+    item.append(safeText(`${taskIndex + 1}. ${task.text}`));
+    article.append(item);
+  });
+  return article;
+}
+
+function draw(data) {
+  const settings = data.appearance;
+  root.style.cssText = `--padding:${settings.padding}px;--border:${settings.border_color};--radius:${settings.border_radius}px;--card:${settings.card_color}${Math.round(settings.card_opacity * 2.55).toString(16).padStart(2, '0')};--name-size:${settings.participant_font_size}px;--task-size:${settings.task_font_size}px;--done:${settings.completed_text_color};font-family:${settings.font_family},sans-serif;color:${settings.text_color};`;
+  root.replaceChildren();
+  root.append(titleCard(settings));
+  const participants = data.participants;
+  if (!participants.length) {
+    const message = document.createElement('div');
+    message.className = 'card';
+    message.append(safeText('Waiting for tasks…'));
+    root.append(message);
+    return;
+  }
+  if (settings.layout_mode === 'streamer_top') {
+    participants.forEach(participant => root.append(card(participant)));
+  } else {
+    root.append(card(participants[index++ % participants.length]));
+  }
+}
+
+async function refresh() {
+  try {
+    draw(await (await fetch('/api/overlay', {cache: 'no-store'})).json());
+  } catch {
+    root.textContent = 'Study Budy overlay is reconnecting…';
+  }
+}
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>

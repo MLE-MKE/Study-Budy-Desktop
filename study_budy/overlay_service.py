@@ -7,6 +7,7 @@ from flask import Flask, jsonify, render_template
 from .storage import TaskRepository
 
 DEFAULT_APPEARANCE = {
+    "task_list_title": "My Study Stream", "title_icon": "book",
     "layout_mode": "cycle", "cycle_seconds": 15, "show_completed": False,
     "hide_empty": True, "font_family": "Comic Sans MS", "participant_font_size": 26,
     "task_font_size": 18, "text_color": "#ffffff", "completed_text_color": "#a9a9a9",

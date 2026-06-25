@@ -20,4 +20,7 @@ def seed_preview_data(repository: TaskRepository) -> None:
                 repository.set_task_complete(task["id"], True)
     repository.set_setting("preview_mode", True)
     repository.set_setting("preview_bot_name", "killer_queens_jester")
+    appearance = repository.get_setting("appearance", {})
+    appearance.update({"task_list_title": "My Study Stream", "title_icon": "book", "show_completed": True})
+    repository.set_setting("appearance", appearance)
     repository.set_setting("preview_seeded", True)
