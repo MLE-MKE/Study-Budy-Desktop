@@ -164,7 +164,7 @@ class CheckInView(QWidget):
         card = self._card()
         layout = QVBoxLayout(card)
         layout.setContentsMargins(Theme.CARD_PADDING, Theme.CARD_PADDING, Theme.CARD_PADDING, Theme.CARD_PADDING)
-        layout.addWidget(QLabel("<b>OBS setup</b>"))
+        layout.addWidget(QLabel("<b>OBS setup -- (This is Beta) </b>"))
         instructions = QTextBrowser()
         instructions.setHtml(
             """
