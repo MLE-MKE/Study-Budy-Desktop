@@ -269,7 +269,7 @@ class TimerView(QWidget):
             The timer supports up to 24 hours.</p>
             <p><b>Examples:</b> 30:00 means 30 minutes, 1:30:00 means 1 hour and 30 minutes, 45 means 45 seconds.</p>
             <h3>Control the timer through Twitch chat</h3>
-            <p>Broadcasters and moderators can use !ttimer start 30:00, pause, resume, add, subtract, reset, clear, status, and help.</p>
+            <p>Broadcasters and moderators can use !ttimer start 30:00, pause, add 05:00, and clear.</p>
             <p>The command intentionally uses two T characters: <b>!ttimer</b>. The timer cannot be set above 24 hours.</p>
             """
         )

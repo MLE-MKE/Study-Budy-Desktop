@@ -204,7 +204,9 @@ class StudyBudyWindow(QMainWindow):
             <h2>Streamlabs Desktop</h2>
             <p>Add a Browser Source, paste the same Study Budy overlay URL, set the recommended dimensions, and position it in your scene.</p>
             <h2>Twitch commands</h2>
-            <p><code>!task Read chapter 8</code><br><code>!tasks</code><br><code>!done 2</code><br><code>!undo 2</code><br><code>!cleardone</code></p>
+            <p><b>Tasks:</b> <code>!addtask Finish laundry</code>, <code>!tasklist</code>, <code>!done 2</code>, <code>!clear 2</code>, <code>!clearall</code></p>
+            <p><b>Check-In:</b> <code>!checkin</code>, <code>!checkout</code>, <code>!dance</code></p>
+            <p><b>Timer for streamer/mods:</b> <code>!ttimer start 30:00</code>, <code>!ttimer pause</code>, <code>!ttimer add 05:00</code>, <code>!ttimer clear</code></p>
             <h2>Privacy</h2>
             <p>Task data and settings are stored locally. The overlay server binds to localhost by default. Do not share local databases or logs if they include private stream notes.</p>
             """

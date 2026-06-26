@@ -9,17 +9,17 @@ The repository is a small Python prototype, not yet a packaged desktop applicati
 | Desktop UI | None | Missing. The only entry point is a console demonstration script. |
 | Web/overlay service | Flask (`app/app.py`) | Basic proof of concept; serves a rotating overlay and JSON endpoints. |
 | Twitch chat | Raw Twitch IRC socket (`app/bot/twitch_bot.py`) | Basic command loop, but it contains hard-coded channel details and an exposed token. |
-| Commands | `!addtask`, `!tasklist`, `!done`, `!clear` | Functional logic for a simple numbered list, with a streamer/mod allow-list for clearing another user. |
+| Commands | Official Study Budy chat grammar | Current app standardizes on `!addtask`, `!tasklist`, `!done`, `!clear`, `!clearall`, `!checkin`, `!checkout`, `!dance`, and moderator/streamer `!ttimer`. |
 | Storage | `data/tasks.json` | Persists simple task text and completion state but has no IDs, timestamps, ordering controls, backups, recovery, or session model. |
 | Overlay | Two HTML templates polling the Flask API | The rotating template is functional in principle; styling and accessibility are prototype-level. |
 | Tests/dependencies | No test suite; `requirements.txt` is empty | Incomplete. |
 
 ## Working features preserved as product behavior
 
-- Viewer task submission via `!addtask` with `|` as a multiple-task separator.
+- Viewer task submission via `!addtask`.
 - Viewer task lists via `!tasklist`.
 - Numbered completion via `!done N`.
-- Numbered and full-list clearing via `!clear`.
+- Numbered clearing via `!clear #` and full-list clearing via `!clearall`.
 - A rotating participant overlay concept, including prioritizing a participant after `!tasklist`.
 - Disk-backed task persistence as a migration source for the new database.
 
@@ -56,7 +56,7 @@ The task repository owns all mutations. Both the desktop controls and Twitch com
 3. Build the PySide6 shell: saved window state, native menus, Dashboard/Tasks/Connections/Appearance/Help navigation, status controller, and first-run guide.
 4. Replace the prototype overlay API with localhost-only, status-aware endpoints and a shared configuration/rendering model; implement Cycling and Streamer-on-top layouts.
 5. Implement task management controls, search/filter/reorder/confirmation flows, and rollover behavior.
-6. Add Twitch OAuth/secure credential storage and resilient chat connection. Preserve the existing command grammar while tightening validation.
+6. Add Twitch OAuth/secure credential storage and resilient chat connection. Standardize the official command grammar while tightening validation.
 7. Add optional OBS WebSocket support plus in-app OBS/Streamlabs Browser Source guidance.
 8. Finish appearance editing, asset management, diagnostics, logs, end-to-end testing, documentation, and PyInstaller installer build instructions.
 

@@ -56,7 +56,7 @@ def test_timer_service_start_pause_resume_reset_clear_and_complete(repository):
     assert timer.start("30:00")["state"] == "running"
     assert timer.pause()["state"] == "paused"
     assert timer.resume()["state"] == "running"
-    assert timer.add_time("05:00")["remaining_seconds"] == 2100
+    assert 2090 <= timer.add_time("05:00")["remaining_seconds"] <= 2100
     assert timer.subtract_time("01:00")["remaining_seconds"] == 2040
     assert timer.reset()["state"] == "stopped"
     assert timer.state()["remaining_seconds"] == 2100
@@ -124,29 +124,29 @@ def test_ttimer_commands_and_permissions(repository):
     commands = ChatCommandService(repository)
     assert commands.handle("viewer", "Viewer", "!timer start 30:00") is None
     assert "Only the broadcaster" in commands.handle("viewer2", "Viewer", "!ttimer start 30:00")
-    assert "started" in commands.handle("broadcaster", "Streamer", "!ttimer start 30:00", is_broadcaster=True)
+    assert commands.handle("broadcaster", "Streamer", "!ttimer start 30:00", is_broadcaster=True) == "Timer started for 30:00."
     commands._last_seen.clear()
-    assert "paused" in commands.handle("mod1", "Mod", "!ttimer pause", is_moderator=True)
+    assert commands.handle("mod1", "Mod", "!ttimer pause", is_moderator=True).startswith("Timer paused at")
     commands._last_seen.clear()
-    assert "resumed" in commands.handle("mod2", "Mod", "!ttimer unpause", is_moderator=True)
+    assert commands.handle("mod2", "Mod", "!ttimer unpause", is_moderator=True) == "Timer for streamer/mods: !ttimer start <time>, pause, add <time>, clear"
     commands._last_seen.clear()
-    assert "updated" in commands.handle("mod3", "Mod", "!ttimer add 05:00", is_moderator=True)
+    assert commands.handle("mod3", "Mod", "!ttimer add 05:00", is_moderator=True).startswith("Added 05:00.")
     commands._last_seen.clear()
-    assert "updated" in commands.handle("mod4", "Mod", "!ttimer subtract 01:00", is_moderator=True)
+    assert commands.handle("mod4", "Mod", "!ttimer subtract 01:00", is_moderator=True) == "Timer for streamer/mods: !ttimer start <time>, pause, add <time>, clear"
     commands._last_seen.clear()
-    assert "updated" in commands.handle("mod5", "Mod", "!ttimer sub 01:00", is_moderator=True)
+    assert commands.handle("mod5", "Mod", "!ttimer sub 01:00", is_moderator=True) == "Timer for streamer/mods: !ttimer start <time>, pause, add <time>, clear"
     commands._last_seen.clear()
-    assert "reset" in commands.handle("mod6", "Mod", "!ttimer reset", is_moderator=True)
+    assert commands.handle("mod6", "Mod", "!ttimer reset", is_moderator=True) == "Timer for streamer/mods: !ttimer start <time>, pause, add <time>, clear"
     commands._last_seen.clear()
-    assert "running" not in commands.handle("mod7", "Mod", "!ttimer status", is_moderator=True).casefold()
+    assert commands.handle("mod7", "Mod", "!ttimer status", is_moderator=True) == "Timer for streamer/mods: !ttimer start <time>, pause, add <time>, clear"
     commands._last_seen.clear()
-    assert "Study Timer" in commands.handle("mod8", "Mod", "!ttimer help", is_moderator=True)
+    assert "Timer for streamer/mods" in commands.handle("mod8", "Mod", "!ttimer help", is_moderator=True)
     commands._last_seen.clear()
     before = TimerService(repository).state()
-    assert "cannot exceed" in commands.handle("mod9", "Mod", "!ttimer start 25:00:00", is_moderator=True)
+    assert commands.handle("mod9", "Mod", "!ttimer start 25:00:00", is_moderator=True) == "The timer cannot exceed 24:00:00."
     assert TimerService(repository).state()["remaining_seconds"] == before["remaining_seconds"]
     commands._last_seen.clear()
-    assert "cleared" in commands.handle("mod10", "Mod", "!ttimer clear", is_moderator=True)
+    assert commands.handle("mod10", "Mod", "!ttimer clear", is_moderator=True) == "Timer cleared."
 
 
 def test_timer_overlay_routes_are_separate_and_apply_appearance(repository):

@@ -12,7 +12,7 @@ Study Budy is a Windows-first desktop task manager for Twitch study, coworking, 
 - Local-only (`127.0.0.1`) Browser Source overlay with Cycling and Streamer-on-top layout modes.
 - Overlay URL copying, preview, start/stop/restart controls, and explicit status text.
 - Appearance settings for layout, cycle time, font, text/background color, and opacity.
-- Preserved Twitch command grammar: `!addtask`, `!tasklist`, `!done`, and `!clear`.
+- Official Twitch commands: `!addtask`, `!tasklist`, `!done`, `!clear`, `!clearall`, `!checkin`, `!checkout`, `!dance`, and moderator/streamer `!ttimer`.
 
 ## Quick start for developers
 

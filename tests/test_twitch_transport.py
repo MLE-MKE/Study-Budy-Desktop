@@ -72,7 +72,7 @@ def test_live_message_reaches_existing_command_dispatcher(tmp_path):
             text="!addtask Test task",
         )
     )
-    assert response == "Task added for Alex."
+    assert response == "Added task 1: Test task"
     assert repository.task_snapshot()[0]["tasks"][0]["text"] == "Test task"
 
 
@@ -114,6 +114,6 @@ def test_sender_failure_does_not_undo_local_command(tmp_path):
             text="!addtask Still saved",
         )
     )
-    assert response == "Task added for Alex."
+    assert response == "Added task 1: Still saved"
     assert repository.task_snapshot()[0]["tasks"][0]["text"] == "Still saved"
     assert "failed" in chat.sender_state.casefold()

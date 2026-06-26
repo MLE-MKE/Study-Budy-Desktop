@@ -100,6 +100,9 @@ html, body {
 .leaving {
   animation: leave-portal .8s ease-in both;
 }
+.dancing {
+  animation: dance-wiggle 3s ease-in-out both;
+}
 
 .portal {
   position: absolute;
@@ -130,9 +133,17 @@ html, body {
   0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(.2); }
   20%, 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
+@keyframes dance-wiggle {
+  0%, 100% { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+  15% { transform: translate(calc(-50% - 10px), calc(-50% - 8px)) rotate(-7deg) scale(1.08); }
+  30% { transform: translate(calc(-50% + 10px), -50%) rotate(7deg) scale(.96); }
+  45% { transform: translate(calc(-50% - 8px), calc(-50% - 10px)) rotate(-5deg) scale(1.06); }
+  60% { transform: translate(calc(-50% + 8px), -50%) rotate(5deg) scale(.98); }
+  75% { transform: translate(-50%, calc(-50% - 12px)) rotate(0deg) scale(1.1); }
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .checkin-avatar, .bubble, .portal, .leaving {
+  .checkin-avatar, .bubble, .portal, .leaving, .dancing {
     animation: none;
   }
 }

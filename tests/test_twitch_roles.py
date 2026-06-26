@@ -102,9 +102,9 @@ def test_incoming_messages_route_to_command_parser_and_create_response(tmp_path)
     sender = DryRunChatSender()
     chat = TwitchChatCoordinator(repository, sender)
     response = chat.route_incoming_message("killer_queen55", "42", "viewer", "!addtask Finish laundry")
-    assert response == "Task added for viewer."
+    assert response == "Added task 1: Finish laundry"
     assert repository.task_snapshot()[0]["tasks"][0]["text"] == "Finish laundry"
-    assert sender.sent == [("killer_queen55", "killer_queens_jester", "@viewer Task added for viewer.")]
+    assert sender.sent == [("killer_queen55", "killer_queens_jester", "@viewer Added task 1: Finish laundry")]
 
 
 def test_no_sender_still_processes_locally_and_logs_warning(tmp_path, caplog):
@@ -114,7 +114,7 @@ def test_no_sender_still_processes_locally_and_logs_warning(tmp_path, caplog):
     TwitchChatCoordinator(repository).set_response_mode(RESPONSE_MODE_BOT)
     caplog.set_level(logging.WARNING)
     response = TwitchChatCoordinator(repository).route_incoming_message("killer_queen55", "42", "viewer", "!addtask Local only")
-    assert response == "Task added for viewer."
+    assert response == "Added task 1: Local only"
     assert repository.task_snapshot()[0]["tasks"][0]["text"] == "Local only"
     assert "no chat response account" in caplog.text
 
