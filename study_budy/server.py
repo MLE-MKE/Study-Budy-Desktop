@@ -36,6 +36,10 @@ class OverlayServer:
     def checkin_url(self) -> str:
         return f"http://{self.host}:{self.port}/checkin"
 
+    @property
+    def timer_url(self) -> str:
+        return f"http://{self.host}:{self.port}/timer"
+
     def start(self) -> None:
         if self.running:
             return

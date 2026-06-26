@@ -7,6 +7,7 @@ from time import monotonic
 
 from .checkin import CheckInService
 from .storage import TaskRepository, ValidationError
+from .timer.commands import TimerCommandService
 
 COMMANDS = {
     "task": "!task <description> - add a task",
@@ -18,6 +19,7 @@ COMMANDS = {
     "checkin": "!checkin - join the Check-In shape overlay",
     "shape": "!shape circle|triangle|square - choose your shape",
     "leave": "!leave - leave the Check-In shape overlay",
+    "ttimer": "!ttimer help - show Study Timer commands",
     "help": "!help - show commands",
 }
 
@@ -30,8 +32,17 @@ class ChatCommandService:
     def __post_init__(self) -> None:
         self._last_seen = {}
         self.checkins = CheckInService(self.repository)
+        self.timers = TimerCommandService(self.repository)
 
-    def handle(self, user_id: str, display_name: str, message: str) -> str | None:
+    def handle(
+        self,
+        user_id: str,
+        display_name: str,
+        message: str,
+        *,
+        is_broadcaster: bool = False,
+        is_moderator: bool = False,
+    ) -> str | None:
         if not message.startswith("!"):
             return None
         timestamp = monotonic()
@@ -42,6 +53,9 @@ class ChatCommandService:
         command, argument = command.casefold(), argument.strip()
         participant = self.repository.get_or_create_participant(display_name, "viewer", user_id)
         tasks = self.repository.list_tasks(participant["id"])
+
+        if command == "ttimer":
+            return self.timers.handle(message, is_broadcaster=is_broadcaster, is_moderator=is_moderator)
 
         if command in {"task", "addtask"}:
             try:

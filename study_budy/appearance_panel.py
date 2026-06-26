@@ -82,7 +82,7 @@ class AppearancePanel(QFrame):
         layout.addLayout(form)
 
         buttons = QHBoxLayout()
-        upload = QPushButton("Upload Image")
+        upload = QPushButton("Upload Image (Beta) ")
         upload.setIcon(icon("upload"))
         upload.clicked.connect(self.choose_image)
         save = QPushButton("Save")
