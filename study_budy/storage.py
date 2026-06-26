@@ -118,6 +118,15 @@ class TaskRepository:
             raise ValidationError("Participant names must be between 1 and 80 characters.")
         normalized = name.casefold()
         with self.connection() as conn:
+            if twitch_user_id:
+                row = conn.execute("SELECT * FROM participants WHERE twitch_user_id = ?", (twitch_user_id,)).fetchone()
+                if row:
+                    conn.execute(
+                        "UPDATE participants SET display_name=?, participant_type=?, is_active=1, updated_at=? WHERE id=?",
+                        (name, participant_type, now(), row["id"]),
+                    )
+                    row = conn.execute("SELECT * FROM participants WHERE id=?", (row["id"],)).fetchone()
+                    return self._participant(row)
             row = conn.execute(
                 "SELECT * FROM participants WHERE normalized_name = ?", (normalized,)
             ).fetchone()
@@ -138,9 +147,9 @@ class TaskRepository:
             )
             return self._participant(conn.execute("SELECT * FROM participants WHERE id=?", (participant_id,)).fetchone())
 
-    def add_task(self, participant_name: str, text: str, participant_type: str = "viewer") -> dict[str, Any]:
+    def add_task(self, participant_name: str, text: str, participant_type: str = "viewer", twitch_user_id: str | None = None) -> dict[str, Any]:
         clean = self.validate_task_text(text)
-        participant = self.get_or_create_participant(participant_name, participant_type)
+        participant = self.get_or_create_participant(participant_name, participant_type, twitch_user_id)
         with self.connection() as conn:
             position = conn.execute(
                 "SELECT COALESCE(MAX(position), 0) + 1 FROM tasks WHERE participant_id=?",
@@ -233,6 +242,13 @@ class TaskRepository:
                 query += " AND participant_id=?"
                 args.append(participant_id)
             return conn.execute(query, args).rowcount
+
+    def archive_all_tasks(self, participant_id: str) -> int:
+        with self.connection() as conn:
+            return conn.execute(
+                "UPDATE tasks SET archived_at=?, updated_at=? WHERE participant_id=? AND archived_at IS NULL",
+                (now(), now(), participant_id),
+            ).rowcount
 
     def lifetime_completed(self) -> int:
         return int(self.get_setting("lifetime_completed", 0))

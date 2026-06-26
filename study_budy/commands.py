@@ -10,20 +10,22 @@ from .storage import TaskRepository, ValidationError
 from .timer.commands import TimerCommandService
 
 COMMANDS = {
-    "task": "!task <description> - add a task",
     "addtask": "!addtask <description> - add a task",
-    "tasks": "!tasks - show your current tasks",
     "tasklist": "!tasklist - show your current tasks",
-    "done": "!done <number> - finish a task",
-    "undo": "!undo <number> - reopen a task",
-    "cleardone": "!cleardone - archive finished tasks",
-    "clear": "!clear - archive finished tasks",
+    "done": "!done <task number> - complete one task",
+    "clear": "!clear <task number> - clear one task",
+    "clearall": "!clearall - clear your whole task list",
     "checkin": "!checkin - join the Check-In shape overlay",
-    "shape": "!shape circle|triangle|square - choose your shape",
-    "leave": "!leave - leave the Check-In shape overlay",
-    "ttimer": "!ttimer help - show Study Timer commands",
+    "checkout": "!checkout - leave the Check-In shape overlay",
+    "dance": "!dance - make your checked-in shape dance",
+    "ttimer": "!ttimer start <time>|pause|add <time>|clear",
     "help": "!help - show commands",
 }
+HELP_TEXT = (
+    "Tasks: !addtask <task>, !tasklist, !done #, !clear #, !clearall | "
+    "Check-In: !checkin, !checkout, !dance | "
+    "Timer for streamer/mods: !ttimer start <time>, pause, add <time>, clear"
+)
 
 
 @dataclass
@@ -52,54 +54,84 @@ class ChatCommandService:
             return "Please wait a moment before repeating a Study Budy command."
         self._last_seen[user_id] = timestamp
         command, _, argument = message[1:].partition(" ")
-        command, argument = command.casefold(), argument.strip()
+        command, argument = command.casefold(), " ".join(argument.split())
         participant = self.repository.get_or_create_participant(display_name, "viewer", user_id)
         tasks = self.repository.list_tasks(participant["id"])
 
         if command == "ttimer":
             return self.timers.handle(message, is_broadcaster=is_broadcaster, is_moderator=is_moderator)
 
-        if command in {"task", "addtask"}:
+        if command == "addtask":
+            if not argument:
+                return "Please include a task. Example: !addtask Finish laundry"
             try:
-                self.repository.add_task(display_name, argument)
+                task = self.repository.add_task(display_name, argument, twitch_user_id=user_id)
             except ValidationError as exc:
                 return str(exc)
             self.checkins.emit_event("task_added", user_id, display_name, {})
-            return f"Task added for {display_name}."
+            updated_tasks = self.repository.list_tasks(participant["id"])
+            number = next((index + 1 for index, item in enumerate(updated_tasks) if item["id"] == task["id"]), len(updated_tasks))
+            return f"Added task {number}: {task['text']}"
 
-        if command in {"tasks", "tasklist"}:
-            active = [task for task in tasks if not task["is_complete"]]
-            return "No active tasks." if not active else " | ".join(f"{i + 1}. {task['text']}" for i, task in enumerate(active))
+        if command == "tasklist":
+            if not tasks:
+                return "Your task list is empty. Add one with !addtask"
+            parts = [f"{index + 1}. {'✅ ' if task['is_complete'] else ''}{task['text']}" for index, task in enumerate(tasks)]
+            response = "Your tasks: " + " | ".join(parts)
+            if len(response) > 430:
+                return f"You have {len(tasks)} task(s). Use !done # or !clear # with the task number shown in Study Budy."
+            return response
 
-        if command in {"done", "undo"}:
-            if not argument.isdigit() or int(argument) < 1 or int(argument) > len(tasks):
-                return f"Use !{command} followed by a valid task number."
-            self.repository.set_task_complete(tasks[int(argument) - 1]["id"], command == "done")
-            if command == "done":
-                self.checkins.emit_event("task_completed", user_id, display_name, {})
-            return "Task completed." if command == "done" else "Task reopened."
+        if command == "done":
+            index = self._task_number(argument, "done")
+            if isinstance(index, str):
+                return index
+            if index < 1 or index > len(tasks):
+                return f"Task {argument} was not found. Use !tasklist to see your task numbers."
+            task = self.repository.set_task_complete(tasks[index - 1]["id"], True)
+            self.checkins.emit_event("task_completed", user_id, display_name, {})
+            return f"Completed task {index}: {task['text']}"
 
-        if command in {"cleardone", "clear"}:
-            count = self.repository.archive_completed(participant["id"])
-            return f"Archived {count} finished task(s)."
+        if command == "clear":
+            index = self._task_number(argument, "clear")
+            if isinstance(index, str):
+                return index
+            if index < 1 or index > len(tasks):
+                return f"Task {argument} was not found. Use !tasklist to see your task numbers."
+            task = tasks[index - 1]
+            self.repository.archive_task(task["id"])
+            return f"Cleared task {index}: {task['text']}"
+
+        if command == "clearall":
+            count = self.repository.archive_all_tasks(participant["id"])
+            return "Your task list is already empty." if count == 0 else "Your task list has been cleared."
 
         if command == "checkin":
-            checkin = self.checkins.checkin(user_id, display_name)
-            return f"{display_name} checked in as a {checkin['shape']}."
+            if any(item["user_id"] == user_id for item in self.checkins.active_checkins()):
+                return "You are already checked in."
+            self.checkins.checkin(user_id, display_name)
+            return "You are checked in!"
 
-        if command == "shape":
-            try:
-                shape = self.checkins.set_shape(user_id, display_name, argument)
-            except ValueError as exc:
-                return str(exc)
-            return f"{display_name}'s shape is now {shape['shape']}."
-
-        if command == "leave":
+        if command == "checkout":
             if self.checkins.leave(user_id, display_name):
-                return f"{display_name} left the Check-In overlay."
+                return "You are checked out. See you next time!"
             return "You are not currently checked in."
 
+        if command == "dance":
+            result = self.checkins.dance(user_id, display_name)
+            if result == "dancing":
+                return "Your shape is dancing!"
+            if result == "cooldown":
+                return "Your shape needs a moment before dancing again."
+            return "Check in first with !checkin"
+
         if command == "help":
-            return "Study Budy: " + " | ".join(COMMANDS.values())
+            return HELP_TEXT
 
         return None
+
+    @staticmethod
+    def _task_number(argument: str, command: str) -> int | str:
+        if not argument or not argument.isdigit():
+            return f"Use a task number. Example: !{command} 2"
+        return int(argument)

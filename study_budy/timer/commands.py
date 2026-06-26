@@ -4,14 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .parser import TimerParseError, format_duration
+from .parser import TimerParseError, format_duration, parse_duration
 from .service import TimerService
 from ..storage import TaskRepository
 
 
 HELP_TEXT = (
-    "Study Timer: !ttimer start 30:00 | pause | resume | add 05:00 | "
-    "subtract 01:00 | reset | clear | status"
+    "Timer for streamer/mods: !ttimer start <time>, pause, add <time>, clear"
 )
 
 
@@ -41,34 +40,34 @@ class TimerCommandService:
         action = action.casefold()
         try:
             if action == "start":
+                if not argument.strip():
+                    return "Include a duration. Example: !ttimer start 30:00"
                 state = self.timer.start(argument)
-                return f"Study timer started: {format_duration(state['remaining_seconds'])}."
+                return f"Timer started for {format_duration(state['remaining_seconds'])}."
             if action == "pause":
-                state = self.timer.pause()
-                return f"Study timer paused: {format_duration(state['remaining_seconds'])} remaining."
-            if action in {"resume", "unpause"}:
                 before = self.timer.state()
-                state = self.timer.resume()
-                if before["state"] != "paused":
-                    return "There is no paused Study timer to resume."
-                return f"Study timer resumed: {format_duration(state['remaining_seconds'])} remaining."
+                if before["state"] != "running":
+                    return "There is no running timer to pause."
+                state = self.timer.pause()
+                return f"Timer paused at {format_duration(state['remaining_seconds'])}."
             if action == "add":
+                if not argument.strip():
+                    return "Include a duration. Example: !ttimer add 05:00"
+                amount = parse_duration(argument)
                 state = self.timer.add_time(argument)
-                return f"Study timer updated: {format_duration(state['remaining_seconds'])} remaining."
-            if action in {"subtract", "sub"}:
-                state = self.timer.subtract_time(argument)
-                return f"Study timer updated: {format_duration(state['remaining_seconds'])} remaining."
-            if action == "reset":
-                state = self.timer.reset()
-                return f"Study timer reset to {format_duration(state['remaining_seconds'])}."
+                return f"Added {format_duration(amount)}. Timer now has {format_duration(state['remaining_seconds'])} remaining."
             if action == "clear":
                 self.timer.clear()
-                return "Study timer cleared."
-            if action == "status":
-                state = self.timer.state()
-                return f"Study timer is {state['state']}: {format_duration(state['remaining_seconds'])} remaining."
+                return "Timer cleared."
             if action == "help":
                 return HELP_TEXT
         except TimerParseError as exc:
+            text = str(exc)
+            if "Enter a timer duration" in text:
+                return f"Include a duration. Example: !ttimer {action or 'start'} 30:00"
+            if "cannot exceed 24 hours" in text:
+                return "The timer cannot exceed 24:00:00."
+            if action == "start":
+                return "Use !ttimer start MM:SS or !ttimer start HH:MM:SS. Maximum: 24:00:00."
             return str(exc)
         return HELP_TEXT

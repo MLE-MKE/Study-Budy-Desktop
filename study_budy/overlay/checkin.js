@@ -85,6 +85,14 @@ function showPortal(userId) {
   setTimeout(() => portal.remove(), 950);
 }
 
+function showDance(userId) {
+  const avatar = shapeLayer.querySelector(`[data-user-id="${CSS.escape(userId)}"]`);
+  if (!avatar) return;
+  avatar.classList.add("dancing");
+  showBubble(userId, "Dancing!");
+  setTimeout(() => avatar.classList.remove("dancing"), 3200);
+}
+
 function applyEvents(events) {
   events.forEach(event => {
     if (event.id <= lastEventId) return;
@@ -93,6 +101,7 @@ function applyEvents(events) {
     if (event.type === "checkin_left") showPortal(event.user_id);
     if (event.type === "task_added") showBubble(event.user_id, "Task added!");
     if (event.type === "task_completed") showBubble(event.user_id, "I did it!");
+    if (event.type === "checkin_dance") showDance(event.user_id);
   });
 }
 

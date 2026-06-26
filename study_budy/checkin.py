@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 from .storage import TaskRepository, now
@@ -54,6 +55,7 @@ DEFAULT_CHECKIN_APPEARANCE = {
 }
 
 CHECKIN_MESSAGES = ["I'm here!", "Ready to study!", "Let's work!"]
+DANCE_COOLDOWN_SECONDS = 10
 
 
 def initialize_checkin(repository: TaskRepository) -> None:
@@ -135,6 +137,26 @@ class CheckInService:
         with self.repository.connection() as conn:
             conn.execute("UPDATE checkin_users SET active_state='inactive', updated_at=? WHERE user_id=?", (now(), user_id))
         return True
+
+    def dance(self, user_id: str, display_name: str) -> str:
+        timestamp = now()
+        with self.repository.connection() as conn:
+            row = conn.execute("SELECT * FROM checkin_users WHERE user_id=? AND active_state='active'", (user_id,)).fetchone()
+            if not row:
+                return "not_checked_in"
+            recent = conn.execute(
+                "SELECT created_at FROM checkin_events WHERE type='checkin_dance' AND user_id=? ORDER BY id DESC LIMIT 1",
+                (user_id,),
+            ).fetchone()
+            if recent:
+                try:
+                    elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(recent["created_at"])).total_seconds()
+                except ValueError:
+                    elapsed = DANCE_COOLDOWN_SECONDS
+                if elapsed < DANCE_COOLDOWN_SECONDS:
+                    return "cooldown"
+        self.emit_event("checkin_dance", user_id, display_name, {"animation": "dance", "duration": 3})
+        return "dancing"
 
     def set_shape(self, user_id: str, display_name: str, shape: str) -> dict[str, Any]:
         clean = shape.casefold().strip()
