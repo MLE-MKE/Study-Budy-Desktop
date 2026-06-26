@@ -12,7 +12,10 @@ from .models import TokenSet
 
 
 SERVICE_NAME = "Study Budy Twitch"
-STREAMER_ACCOUNT = "streamer"
+STREAMER_CREDENTIAL_KEY = "study_budy_twitch_streamer"
+BOT_CREDENTIAL_KEY = "study_budy_twitch_bot"
+STREAMER_ACCOUNT = STREAMER_CREDENTIAL_KEY
+BOT_ACCOUNT = BOT_CREDENTIAL_KEY
 
 
 class CredentialStoreError(RuntimeError):

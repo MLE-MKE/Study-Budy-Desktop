@@ -53,6 +53,19 @@ class StreamerAccount:
     last_validated_at: str
 
 
+@dataclass(frozen=True)
+class TwitchAccountMetadata:
+    role: str
+    user_id: str
+    login: str
+    display_name: str
+    granted_scopes: tuple[str, ...]
+    connected_at: str
+    last_validated_at: str
+    authorization_status: str = "Authorized"
+    chat_status: str = "Not connected"
+
+
 def missing_required_scopes(scopes: tuple[str, ...] | list[str]) -> tuple[str, ...]:
     granted = set(scopes)
     return tuple(scope for scope in REQUIRED_CHAT_SCOPES if scope not in granted)
