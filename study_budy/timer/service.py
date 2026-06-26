@@ -15,6 +15,9 @@ def timestamp() -> float:
     return datetime.now(timezone.utc).timestamp()
 
 
+_RESTORED_REPOSITORIES: set[str] = set()
+
+
 @dataclass
 class TimerService:
     repository: TaskRepository
@@ -24,6 +27,10 @@ class TimerService:
             self.repository.set_setting("timer_state", DEFAULT_TIMER_STATE)
         if self.repository.get_setting("timer_appearance", None) is None:
             self.repository.set_setting("timer_appearance", DEFAULT_TIMER_APPEARANCE)
+        key = str(self.repository.path.resolve())
+        if key not in _RESTORED_REPOSITORIES:
+            self._restore_after_startup()
+            _RESTORED_REPOSITORIES.add(key)
 
     def state(self) -> dict[str, Any]:
         state = {**DEFAULT_TIMER_STATE, **(self.repository.get_setting("timer_state", {}) or {})}
@@ -161,11 +168,6 @@ class TimerService:
     def _normalize_running_state(self, state: dict[str, Any]) -> dict[str, Any]:
         if state.get("state") != "running":
             return state
-        if not state.get("continue_after_restart", True):
-            state["state"] = "paused"
-            state["paused_at"] = timestamp()
-            state["updated_at"] = state["paused_at"]
-            return self._save(state)
         now_value = timestamp()
         updated_at = float(state.get("updated_at") or now_value)
         elapsed = max(0, int(now_value - updated_at))
@@ -178,6 +180,21 @@ class TimerService:
             state["completed_at"] = state.get("completed_at") or now_value
             state["completion_fired"] = True
         return self._save(state)
+
+    def _restore_after_startup(self) -> None:
+        state = {**DEFAULT_TIMER_STATE, **(self.repository.get_setting("timer_state", {}) or {})}
+        if state.get("state") == "running" and not state.get("continue_after_restart", True):
+            now_value = timestamp()
+            updated_at = float(state.get("updated_at") or now_value)
+            elapsed = max(0, int(now_value - updated_at))
+            state["remaining_seconds"] = max(0, int(state.get("remaining_seconds", 0)) - elapsed)
+            state["state"] = "complete" if state["remaining_seconds"] <= 0 else "paused"
+            state["paused_at"] = now_value
+            state["updated_at"] = now_value
+            if state["remaining_seconds"] <= 0:
+                state["completed_at"] = now_value
+                state["completion_fired"] = True
+            self._save(state)
 
     def _save(self, state: dict[str, Any]) -> dict[str, Any]:
         clean = {**DEFAULT_TIMER_STATE, **state}

@@ -37,6 +37,7 @@ from .sidebar import Sidebar
 from .storage import TaskRepository, ValidationError
 from .task_window import TaskWindow
 from .theme import Theme, app_stylesheet
+from .timer_view import TimerView
 
 LOG = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class StudyBudyWindow(QMainWindow):
         file_menu.addAction("Exit", self.close)
 
         view_menu = self.menuBar().addMenu("&View")
-        for index, name in enumerate(("Dashboard", "Tasks", "Connections", "Appearance", "Check In", "Help")):
+        for index, name in enumerate(("Dashboard", "Tasks", "Connections", "Appearance", "Timer", "Check In", "Help")):
             view_menu.addAction(name, self.open_task_window if name == "Tasks" else lambda checked=False, page=index: self.go_to_page(page))
         view_menu.addAction("Refresh overlay", self.restart_overlay)
         view_menu.addAction("Reset window layout", self.reset_window)
@@ -81,15 +82,15 @@ class StudyBudyWindow(QMainWindow):
         settings_menu = self.menuBar().addMenu("&Settings")
         settings_menu.addAction("General settings", lambda: self.go_to_page(0))
         settings_menu.addAction("Twitch settings", lambda: self.go_to_page(2))
-        settings_menu.addAction("OBS and Streamlabs settings", lambda: self.go_to_page(5))
+        settings_menu.addAction("OBS and Streamlabs settings", lambda: self.go_to_page(6))
         settings_menu.addAction("Storage settings", self.open_data_folder)
         settings_menu.addAction("Appearance settings", lambda: self.go_to_page(3))
 
         help_menu = self.menuBar().addMenu("&Help")
-        help_menu.addAction("Setup instructions", lambda: self.go_to_page(5))
-        help_menu.addAction("OBS setup instructions", lambda: self.go_to_page(5))
-        help_menu.addAction("Streamlabs setup instructions", lambda: self.go_to_page(5))
-        help_menu.addAction("Twitch command instructions", lambda: self.go_to_page(5))
+        help_menu.addAction("Setup instructions", lambda: self.go_to_page(6))
+        help_menu.addAction("OBS setup instructions", lambda: self.go_to_page(6))
+        help_menu.addAction("Streamlabs setup instructions", lambda: self.go_to_page(6))
+        help_menu.addAction("Twitch command instructions", lambda: self.go_to_page(6))
         help_menu.addAction("Contact support", lambda: QDesktopServices.openUrl(QUrl("mailto:hotkeyllc@outlook.com?subject=Study%20Budy%20Support%20Request")))
         help_menu.addAction("Open logs folder", self.open_logs_folder)
         help_menu.addAction("About Study Budy", self.about_study_budy)
@@ -114,11 +115,12 @@ class StudyBudyWindow(QMainWindow):
             "preview": self.open_preview,
             "task_window": self.open_task_window,
             "appearance": lambda: self.go_to_page(3),
-            "help": lambda: self.go_to_page(5),
+            "help": lambda: self.go_to_page(6),
             "appearance_saved": self.appearance_saved,
         }
         self.dashboard = DashboardView(self.repository, self.overlay_server, callbacks)
         self.connections = ConnectionsView(self.repository, self.refresh_all)
+        self.timer_page = TimerView(self.repository, self.overlay_server, callbacks)
         self.checkin_page = CheckInView(self.repository, self.overlay_server, callbacks)
         self.appearance_page = self._appearance_page()
         self.help_page = self._help_page()
@@ -127,6 +129,7 @@ class StudyBudyWindow(QMainWindow):
         self.pages.addWidget(self._tasks_page())
         self.pages.addWidget(self.connections)
         self.pages.addWidget(self.appearance_page)
+        self.pages.addWidget(self.timer_page)
         self.pages.addWidget(self.checkin_page)
         self.pages.addWidget(self.help_page)
         self.pages.currentChanged.connect(self.sidebar.set_active)
@@ -221,6 +224,7 @@ class StudyBudyWindow(QMainWindow):
     def refresh_all(self) -> None:
         self.dashboard.refresh()
         self.connections.refresh()
+        self.timer_page.refresh()
         self.checkin_page.refresh()
         self.full_overlay_preview.refresh()
         self.full_appearance_panel.load()

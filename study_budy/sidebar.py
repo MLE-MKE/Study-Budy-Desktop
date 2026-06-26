@@ -23,8 +23,9 @@ class Sidebar(QFrame):
             ("Tasks", "Tasks", "tasks", 1),
             ("Connections", "Conn", "connections", 2),
             ("Appearance", "Style", "appearance", 3),
-            ("Check In", "Check", "check", 4),
-            ("Help", "Help", "help", 5),
+            ("Timer", "Timer", "timer", 4),
+            ("Check In", "Check", "check", 5),
+            ("Help", "Help", "help", 6),
         ]
 
         self.layout = QVBoxLayout(self)
