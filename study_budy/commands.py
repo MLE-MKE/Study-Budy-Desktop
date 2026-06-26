@@ -13,9 +13,11 @@ COMMANDS = {
     "task": "!task <description> - add a task",
     "addtask": "!addtask <description> - add a task",
     "tasks": "!tasks - show your current tasks",
+    "tasklist": "!tasklist - show your current tasks",
     "done": "!done <number> - finish a task",
     "undo": "!undo <number> - reopen a task",
     "cleardone": "!cleardone - archive finished tasks",
+    "clear": "!clear - archive finished tasks",
     "checkin": "!checkin - join the Check-In shape overlay",
     "shape": "!shape circle|triangle|square - choose your shape",
     "leave": "!leave - leave the Check-In shape overlay",
@@ -65,7 +67,7 @@ class ChatCommandService:
             self.checkins.emit_event("task_added", user_id, display_name, {})
             return f"Task added for {display_name}."
 
-        if command == "tasks":
+        if command in {"tasks", "tasklist"}:
             active = [task for task in tasks if not task["is_complete"]]
             return "No active tasks." if not active else " | ".join(f"{i + 1}. {task['text']}" for i, task in enumerate(active))
 
@@ -77,7 +79,7 @@ class ChatCommandService:
                 self.checkins.emit_event("task_completed", user_id, display_name, {})
             return "Task completed." if command == "done" else "Task reopened."
 
-        if command == "cleardone":
+        if command in {"cleardone", "clear"}:
             count = self.repository.archive_completed(participant["id"])
             return f"Archived {count} finished task(s)."
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import logging
 import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from PySide6.QtCore import Qt, QThread, QTimer, QUrl, Signal, Slot
@@ -48,6 +49,14 @@ from .twitch.models import DeviceCode, REQUIRED_CHAT_SCOPES, TokenSet, missing_r
 
 ROLE_LABELS = {"streamer": "Streamer", "bot": "Bot"}
 LOG = logging.getLogger(__name__)
+AUTH_IDLE = "Idle"
+AUTH_REQUESTING = "Requesting Code"
+AUTH_WAITING = "Waiting for Authorization"
+AUTH_AUTHORIZED = "Authorized"
+AUTH_DENIED = "Denied"
+AUTH_EXPIRED = "Expired"
+AUTH_CANCELLED = "Cancelled"
+AUTH_FAILED = "Failed"
 CLIENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9]{20,80}$")
 CLIENT_ID_HELP_TEXT = """How to Find Your Twitch Client ID
 
@@ -74,11 +83,21 @@ The same Client ID is used to authorize both your streamer account and your opti
 """
 
 
+@dataclass
+class AuthorizationContext:
+    role: str
+    state: str = AUTH_IDLE
+    worker: "TwitchAuthWorker | None" = None
+    device: DeviceCode | None = None
+    started_at: datetime | None = None
+    message: str = ""
+
+
 class TwitchAuthWorker(QThread):
     code_ready = Signal(object)
     status_changed = Signal(str)
     authorized = Signal(str, object, object)
-    failed = Signal(str)
+    failed = Signal(str, str)
 
     def __init__(self, role: str, client_id: str, scopes: tuple[str, ...]) -> None:
         super().__init__()
@@ -94,15 +113,23 @@ class TwitchAuthWorker(QThread):
         try:
             label = ROLE_LABELS[self.role].lower()
             client = TwitchDeviceAuthClient(self.client_id)
+            LOG.info("%s device-code request started", ROLE_LABELS[self.role])
             self.status_changed.emit(f"Requesting Twitch authorization for {label} account...")
             device = client.request_device_code(self.scopes)
+            LOG.info("%s device-code response received", ROLE_LABELS[self.role])
             self.code_ready.emit(device)
             self.status_changed.emit(f"Waiting for Twitch authorization for {label} account")
+            LOG.info("%s authorization polling started", ROLE_LABELS[self.role])
             tokens = client.wait_for_token(device, self.scopes, self.cancel_event, self.status_changed.emit)
+            LOG.info("%s authorization approved", ROLE_LABELS[self.role])
             self.status_changed.emit("Authorization approved")
             self.authorized.emit(self.role, device, tokens)
         except TwitchAuthError as exc:
-            self.failed.emit(str(exc))
+            LOG.info("%s authorization ended: %s", ROLE_LABELS[self.role], exc.code)
+            self.failed.emit(self.role, str(exc))
+        except Exception:
+            LOG.exception("%s authorization worker failed", ROLE_LABELS.get(self.role, self.role))
+            self.failed.emit(self.role, "Study Budy hit an unexpected error while connecting to Twitch.")
 
 
 class ConnectionsView(QWidget):
@@ -111,11 +138,12 @@ class ConnectionsView(QWidget):
         self.repository = repository
         self.on_refresh = on_refresh
         self.credential_store = TokenCredentialStore()
-        self.chat = TwitchChatCoordinator(repository)
+        self.chat = TwitchChatCoordinator(repository, credential_store=self.credential_store, client_id_getter=self._client_id_value)
         self.auth_worker: TwitchAuthWorker | None = None
         self.auth_role: str | None = None
         self.current_device: DeviceCode | None = None
         self.code_started_at: datetime | None = None
+        self.auth_context: AuthorizationContext | None = None
 
         page = QVBoxLayout(self)
         page.setContentsMargins(0, 0, 0, 0)
@@ -190,6 +218,10 @@ class ConnectionsView(QWidget):
         self.countdown = QTimer(self)
         self.countdown.setInterval(1000)
         self.countdown.timeout.connect(self.update_countdown)
+        self.chat_status_timer = QTimer(self)
+        self.chat_status_timer.setInterval(2000)
+        self.chat_status_timer.timeout.connect(self.refresh)
+        self.chat_status_timer.start()
         self.refresh()
 
     def _account_card(self, role: str, heading: str, description: str, field_labels: tuple[str, ...]) -> tuple[QFrame, dict[str, QLineEdit]]:
@@ -417,8 +449,8 @@ class ConnectionsView(QWidget):
 
     def connect_account(self, role: str) -> None:
         LOG.info("%s account connection requested", ROLE_LABELS[role])
-        if self.auth_worker and self.auth_worker.isRunning():
-            self.flow_result.setText("A Twitch authorization is already in progress.")
+        if self._authorization_in_progress():
+            self.flow_result.setText("Finish or cancel the current Twitch authorization before connecting another account.")
             return
         client_id = self.client_id.text().strip() or self.repository.get_setting("twitch_client_id", "")
         if not client_id:
@@ -430,19 +462,27 @@ class ConnectionsView(QWidget):
         self.repository.set_setting("twitch_client_id", client_id)
         self.update_client_id_status()
         self.auth_role = role
+        self.auth_context = AuthorizationContext(
+            role=role,
+            state=AUTH_REQUESTING,
+            message=f"Requesting Twitch authorization for {role} account...",
+        )
         self.current_device = None
         self.code_started_at = None
         self.user_code.setText("--------")
+        self.auth_expiration.setText("")
         self.auth_title.setText(f"Authorize Study Budy {ROLE_LABELS[role]} Account")
         self.auth_hint.setText(
             "Sign into the Twitch account you want to use as the Study Budy bot. Do not authorize your streamer account unless you want both roles to use the same account."
             if role == "bot"
             else "Sign into the Twitch account that owns the channel you want Study Budy to monitor."
         )
-        self.auth_status.setText(f"Requesting Twitch authorization for {role} account...")
+        self.auth_status.setText(self.auth_context.message)
+        self.flow_result.setText(self.auth_context.message)
         self.auth_worker = TwitchAuthWorker(role, client_id, REQUIRED_CHAT_SCOPES)
+        self.auth_context.worker = self.auth_worker
         self.auth_worker.code_ready.connect(self.on_code_ready)
-        self.auth_worker.status_changed.connect(self.auth_status.setText)
+        self.auth_worker.status_changed.connect(self.on_auth_status_changed)
         self.auth_worker.authorized.connect(self.on_authorized)
         self.auth_worker.failed.connect(self.on_auth_failed)
         self.auth_worker.finished.connect(self.on_auth_finished)
@@ -476,56 +516,123 @@ class ConnectionsView(QWidget):
         self.flow_result.setText("Authorization code copied.")
 
     def cancel_authorization(self) -> None:
+        if self.auth_context:
+            self.auth_context.state = AUTH_CANCELLED
+            self.auth_context.message = "Authorization cancelled."
         if self.auth_worker and self.auth_worker.isRunning():
             self.auth_worker.cancel()
         self.countdown.stop()
         self.auth_status.setText("Authorization cancelled")
         self.flow_result.setText("Authorization cancelled.")
+        self._clear_authorization_panel()
         self.refresh()
 
     @Slot(object)
     def on_code_ready(self, device: DeviceCode) -> None:
         self.current_device = device
         self.code_started_at = datetime.now(timezone.utc)
+        if self.auth_context:
+            self.auth_context.state = AUTH_WAITING
+            self.auth_context.device = device
+            self.auth_context.started_at = self.code_started_at
+            self.auth_context.message = "Waiting for Twitch authorization"
         self.user_code.setText(device.user_code)
         self.countdown.start()
         self.update_countdown()
 
+    @Slot(str)
+    def on_auth_status_changed(self, message: str) -> None:
+        if self.auth_context:
+            self.auth_context.message = message
+            if "waiting" in message.casefold():
+                self.auth_context.state = AUTH_WAITING
+        self.auth_status.setText(message)
+
     @Slot(str, object, object)
     def on_authorized(self, role: str, _device: DeviceCode, tokens: TokenSet) -> None:
         try:
+            LOG.info("%s token validation started", ROLE_LABELS[role])
             api = TwitchAPIClient(self.client_id.text().strip())
             validation = api.validate_token(tokens.access_token)
             missing = missing_required_scopes(validation.scopes or tokens.scopes)
             if missing:
                 raise TwitchAuthError(f"Required Twitch permissions are missing: {', '.join(missing)}", "missing_scopes")
+            LOG.info("%s token validation succeeded", ROLE_LABELS[role])
             user = api.fetch_user(tokens.access_token)
+            LOG.info("%s user lookup succeeded for %s", ROLE_LABELS[role], user.login)
             credential_key = STREAMER_CREDENTIAL_KEY if role == "streamer" else BOT_CREDENTIAL_KEY
             metadata_key = STREAMER_METADATA_KEY if role == "streamer" else BOT_METADATA_KEY
             self.credential_store.save_tokens(credential_key, tokens)
+            LOG.info("%s credential storage succeeded", ROLE_LABELS[role])
             metadata = account_metadata(role, user, tuple(validation.scopes))
+            if role == "streamer":
+                metadata["chat_status"] = "Authorized. Live chat connection is not implemented yet."
+            else:
+                metadata["chat_status"] = f"Ready to respond as {user.login}. Live chat sending is not implemented yet."
             self.repository.set_setting(metadata_key, metadata)
             self.repository.set_setting("development_bot", False)
             if role == "streamer":
                 self.chat.set_monitored_channel(user.login)
                 self.monitored_channel.setText(user.login)
+                listener_status = self.chat.start_listener(self.credential_store, self._client_id_value)
+                LOG.info("Twitch chat listener startup: %s", listener_status)
+            if role == "bot" and self.response_mode.currentText() == RESPONSE_MODE_AUTOMATIC:
+                self.chat.set_response_mode(RESPONSE_MODE_AUTOMATIC)
+            sender_status = self.chat.prepare_sender(self.credential_store, self._client_id_value)
+            LOG.info("Twitch chat sender readiness: %s", sender_status)
             warning = self.chat.same_account_warning()
-            self.flow_result.setText(warning or f"{ROLE_LABELS[role]} account connected.")
+            if self.auth_context:
+                self.auth_context.state = AUTH_AUTHORIZED
+                self.auth_context.message = f"{ROLE_LABELS[role]} account authorized."
+            self.flow_result.setText(
+                warning
+                or (
+                    f"{ROLE_LABELS[role]} account authorized. "
+                    f"{self.chat.listener_status()} {self.chat.sender_status()}"
+                )
+            )
+            self._clear_authorization_panel()
         except Exception as exc:
+            LOG.exception("%s authorization success cleanup failed", ROLE_LABELS.get(role, role))
+            if self.auth_context:
+                self.auth_context.state = AUTH_FAILED
+                self.auth_context.message = str(exc)
+            self.auth_status.setText(str(exc))
             self.flow_result.setText(str(exc))
         finally:
             self.countdown.stop()
             self.refresh()
             self.on_refresh()
 
-    def on_auth_failed(self, message: str) -> None:
+    def on_auth_failed(self, role: str, message: str) -> None:
+        lower = message.casefold()
+        if self.auth_context:
+            if "denied" in lower:
+                self.auth_context.state = AUTH_DENIED
+            elif "expired" in lower:
+                self.auth_context.state = AUTH_EXPIRED
+            elif "cancel" in lower:
+                self.auth_context.state = AUTH_CANCELLED
+            else:
+                self.auth_context.state = AUTH_FAILED
+            self.auth_context.message = message
+        LOG.info("%s authorization terminal failure: %s", ROLE_LABELS.get(role, role), message)
         self.auth_status.setText(message)
         self.flow_result.setText(message)
         self.countdown.stop()
+        self._clear_authorization_panel()
+        self.refresh()
 
     def on_auth_finished(self) -> None:
+        LOG.info("Twitch authorization worker cleanup completed")
         self.auth_worker = None
-        self.auth_role = None
+        if self.auth_context and self.auth_context.state in {AUTH_REQUESTING, AUTH_WAITING}:
+            self.auth_context.state = AUTH_FAILED
+            self.auth_context.message = "Twitch authorization stopped before it completed."
+            self.flow_result.setText(self.auth_context.message)
+            self._clear_authorization_panel()
+        if not self._authorization_in_progress():
+            self.auth_role = None
         self.refresh()
 
     def update_countdown(self) -> None:
@@ -553,9 +660,12 @@ class ConnectionsView(QWidget):
                 return
             account["last_validated_at"] = account["last_connection_time"] = datetime.now(timezone.utc).isoformat()
             account["authorization_status"] = "Authorized"
-            account["chat_status"] = "Ready (chat transport pending)"
+            if role == "streamer":
+                account["chat_status"] = self.chat.start_listener(self.credential_store, self._client_id_value)
+            else:
+                account["chat_status"] = self.chat.prepare_sender(self.credential_store, self._client_id_value)
             self.repository.set_setting(metadata_key, account)
-            self.flow_result.setText(f"{ROLE_LABELS[role]} authorization is valid. Chat transport is ready to be connected.")
+            self.flow_result.setText(f"{ROLE_LABELS[role]} authorization is valid. {account['chat_status']}")
         except Exception as exc:
             self.flow_result.setText(str(exc))
         self.refresh()
@@ -567,6 +677,11 @@ class ConnectionsView(QWidget):
         metadata_key = STREAMER_METADATA_KEY if role == "streamer" else BOT_METADATA_KEY
         self.credential_store.delete_tokens(key)
         self.repository.set_setting(metadata_key, None)
+        if role == "streamer":
+            self.chat.stop_listener()
+            self.repository.set_setting("twitch_listener_status", "Not connected")
+        if role == "bot":
+            self.repository.set_setting("twitch_sender_status", "Not connected")
         self.refresh()
         self.on_refresh()
 
@@ -587,12 +702,16 @@ class ConnectionsView(QWidget):
         self.active_response.setText(f"Responses will be sent as: {active}" if active else "No response account connected")
         self.listener_status.setText(self.chat.listener_status())
         self.sender_status.setText(self.chat.sender_status())
-        self.auth_card.setVisible(bool(self.auth_worker and self.auth_worker.isRunning()))
+        auth_running = self._authorization_in_progress()
+        self.auth_card.setVisible(auth_running)
         for role in ("streamer", "bot"):
             button = self._connection_button(role)
-            running = bool(self.auth_worker and self.auth_worker.isRunning())
-            button.setEnabled(not running)
-            button.setText("Connecting..." if running and self.auth_role == role else f"Connect {ROLE_LABELS[role]} Account")
+            button.setEnabled(not auth_running)
+            if auth_running and self.auth_role == role:
+                button.setText("Connecting...")
+            else:
+                account = streamer if role == "streamer" else bot
+                button.setText(f"Reconnect {ROLE_LABELS[role]} Account" if account else f"Connect {ROLE_LABELS[role]} Account")
 
     def _fill_account(self, role: str, account: dict | None, fields: dict[str, QLineEdit]) -> None:
         status = getattr(self, f"{role}_status_label")
@@ -609,7 +728,7 @@ class ConnectionsView(QWidget):
             "Channel being monitored": self.chat.monitored_channel() if role == "streamer" else "",
             "Authorization status": account.get("authorization_status", "Not connected"),
             "Chat-listener status": self.chat.listener_status() if role == "streamer" else "",
-            "Chat-send status": "Available as response sender" if connected else "Not connected",
+            "Chat-send status": self.chat.sender_status() if connected else "Not connected",
             "Last connection time": account.get("last_validated_at", ""),
         }
         for label, field in fields.items():
@@ -639,3 +758,24 @@ class ConnectionsView(QWidget):
 
     def _connection_button(self, role: str) -> QPushButton:
         return getattr(self, f"{role}_connect_{ROLE_LABELS[role].lower()}_account")
+
+    def _client_id_value(self) -> str:
+        return self.client_id.text().strip() or self.repository.get_setting("twitch_client_id", "")
+
+    def _authorization_in_progress(self) -> bool:
+        return bool(
+            self.auth_worker
+            and self.auth_worker.isRunning()
+            and (
+                not self.auth_context
+                or self.auth_context.state in {AUTH_REQUESTING, AUTH_WAITING}
+            )
+        )
+
+    def _clear_authorization_panel(self) -> None:
+        self.countdown.stop()
+        self.current_device = None
+        self.code_started_at = None
+        self.user_code.setText("--------")
+        self.auth_expiration.setText("")
+        self.auth_card.setVisible(False)

@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 
 from study_budy.connections_view import CLIENT_ID_HELP_TEXT, ConnectionsView
 from study_budy.storage import TaskRepository
+from study_budy.twitch.chat import BOT_METADATA_KEY, MONITORED_CHANNEL_KEY, STREAMER_METADATA_KEY
 from study_budy.twitch.api import TwitchAPIClient
 from study_budy.twitch.auth import (
     AuthorizationCancelled,
@@ -20,6 +21,14 @@ from study_budy.twitch.auth import (
 )
 from study_budy.twitch.credentials import MemoryTokenCredentialStore, STREAMER_ACCOUNT
 from study_budy.twitch.models import REQUIRED_CHAT_SCOPES, TokenSet, missing_required_scopes
+
+
+class FakeSignal:
+    def __init__(self) -> None:
+        self.callbacks = []
+
+    def connect(self, callback) -> None:
+        self.callbacks.append(callback)
 
 
 class FakeResponse:
@@ -175,7 +184,7 @@ def test_duplicate_connection_attempt_is_blocked(qapp, repository):
 
     view.auth_worker = RunningWorker()
     view.connect_streamer()
-    assert "already in progress" in view.explanation.text()
+    assert "current Twitch authorization" in view.explanation.text()
 
 
 def test_client_id_help_and_validation(qapp, repository, monkeypatch):
@@ -228,6 +237,158 @@ def test_connection_button_feedback_and_restore(qapp, repository):
     view.on_auth_finished()
     assert view.bot_connect_bot_account.text() == "Connect Bot Account"
     assert view.bot_connect_bot_account.isEnabled()
+
+
+def test_bot_button_starts_bot_authorization_with_visible_feedback(qapp, repository, monkeypatch):
+    created = []
+
+    class FakeWorker:
+        def __init__(self, role, client_id, scopes):
+            self.role = role
+            self.client_id = client_id
+            self.scopes = scopes
+            self._running = False
+            self.code_ready = FakeSignal()
+            self.status_changed = FakeSignal()
+            self.authorized = FakeSignal()
+            self.failed = FakeSignal()
+            self.finished = FakeSignal()
+            created.append(self)
+
+        def start(self):
+            self._running = True
+
+        def isRunning(self):
+            return self._running
+
+        def cancel(self):
+            self._running = False
+
+    monkeypatch.setattr("study_budy.connections_view.TwitchAuthWorker", FakeWorker)
+    view = ConnectionsView(repository, lambda: None)
+    view.client_id.setText("a" * 30)
+
+    view.bot_connect_bot_account.click()
+
+    assert created[-1].role == "bot"
+    assert view.bot_connect_bot_account.text() == "Connecting..."
+    assert not view.auth_card.isHidden()
+    assert view.auth_title.text() == "Authorize Study Budy Bot Account"
+    assert "bot" in view.auth_hint.text().casefold()
+    assert "Requesting Twitch authorization for bot account" in view.explanation.text()
+
+
+def test_streamer_authorization_success_clears_panel_and_restores_button(qapp, repository, monkeypatch):
+    class FakeUser:
+        user_id = "123"
+        login = "killer_queen55"
+        display_name = "Killer_Queen55"
+
+    class FakeValidation:
+        scopes = REQUIRED_CHAT_SCOPES
+
+    class FakeAPI:
+        def __init__(self, client_id):
+            self.client_id = client_id
+
+        def validate_token(self, access_token):
+            return FakeValidation()
+
+        def fetch_user(self, access_token):
+            return FakeUser()
+
+    class RunningWorker:
+        def isRunning(self):
+            return True
+
+    monkeypatch.setattr("study_budy.connections_view.TwitchAPIClient", FakeAPI)
+    def fake_start_listener(self, store, getter, status_callback=None):
+        self.listener_state = "Listening in killer_queen55"
+        return self.listener_state
+
+    def fake_prepare_sender(self, store, getter):
+        self.sender_state = "Ready to send as killer_queen55"
+        return self.sender_state
+
+    monkeypatch.setattr("study_budy.twitch.chat.TwitchChatCoordinator.start_listener", fake_start_listener)
+    monkeypatch.setattr("study_budy.twitch.chat.TwitchChatCoordinator.prepare_sender", fake_prepare_sender)
+    view = ConnectionsView(repository, lambda: None)
+    view.credential_store = MemoryTokenCredentialStore()
+    view.client_id.setText("a" * 30)
+    view.auth_worker = RunningWorker()
+    view.auth_role = "streamer"
+    view.auth_context = type("Context", (), {"state": "Waiting for Authorization", "message": "", "role": "streamer"})()
+    view.auth_card.setVisible(True)
+    view.refresh()
+    assert view.streamer_connect_streamer_account.text() == "Connecting..."
+
+    view.on_authorized("streamer", None, TokenSet("access-token", "refresh-token", 100, REQUIRED_CHAT_SCOPES))
+
+    assert not view.auth_card.isVisible()
+    assert view.streamer_connect_streamer_account.text() == "Reconnect Streamer Account"
+    assert view.streamer_connect_streamer_account.isEnabled()
+    assert repository.get_setting(STREAMER_METADATA_KEY)["login"] == "killer_queen55"
+    assert repository.get_setting(MONITORED_CHANNEL_KEY) == "killer_queen55"
+    assert "Listening in killer_queen55" in view.listener_status.text()
+
+
+def test_bot_authorization_success_preserves_streamer_channel(qapp, repository, monkeypatch):
+    repository.set_setting(
+        STREAMER_METADATA_KEY,
+        {
+            "role": "streamer",
+            "user_id": "1",
+            "login": "killer_queen55",
+            "display_name": "Killer_Queen55",
+            "granted_scopes": list(REQUIRED_CHAT_SCOPES),
+            "authorization_status": "Authorized",
+        },
+    )
+    repository.set_setting(MONITORED_CHANNEL_KEY, "killer_queen55")
+
+    class FakeUser:
+        user_id = "2"
+        login = "killer_queens_jester"
+        display_name = "Killer_Queens_Jester"
+
+    class FakeValidation:
+        scopes = REQUIRED_CHAT_SCOPES
+
+    class FakeAPI:
+        def __init__(self, client_id):
+            self.client_id = client_id
+
+        def validate_token(self, access_token):
+            return FakeValidation()
+
+        def fetch_user(self, access_token):
+            return FakeUser()
+
+    class RunningWorker:
+        def isRunning(self):
+            return True
+
+    monkeypatch.setattr("study_budy.connections_view.TwitchAPIClient", FakeAPI)
+    def fake_prepare_bot_sender(self, store, getter):
+        self.sender_state = "Ready to send as killer_queens_jester"
+        return self.sender_state
+
+    monkeypatch.setattr("study_budy.twitch.chat.TwitchChatCoordinator.prepare_sender", fake_prepare_bot_sender)
+    view = ConnectionsView(repository, lambda: None)
+    view.credential_store = MemoryTokenCredentialStore()
+    view.client_id.setText("a" * 30)
+    view.auth_worker = RunningWorker()
+    view.auth_role = "bot"
+    view.auth_context = type("Context", (), {"state": "Waiting for Authorization", "message": "", "role": "bot"})()
+    view.auth_card.setVisible(True)
+
+    view.on_authorized("bot", None, TokenSet("bot-access", "bot-refresh", 100, REQUIRED_CHAT_SCOPES))
+
+    assert repository.get_setting(BOT_METADATA_KEY)["login"] == "killer_queens_jester"
+    assert repository.get_setting(STREAMER_METADATA_KEY)["login"] == "killer_queen55"
+    assert repository.get_setting(MONITORED_CHANNEL_KEY) == "killer_queen55"
+    assert view.bot_connect_bot_account.text() == "Reconnect Bot Account"
+    assert "killer_queens_jester" in view.sender_status.text()
 
 
 def test_tokens_are_not_stored_in_settings_sqlite_or_logs(repository, caplog):

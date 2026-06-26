@@ -25,6 +25,26 @@ def test_empty_and_long_commands_are_rejected(tmp_path):
     assert "at most" in service.handle("1", "Alex", "!task " + "x" * 281)
 
 
+def test_required_twitch_command_aliases_route_to_existing_services(tmp_path):
+    repo = repository(tmp_path)
+    service = ChatCommandService(repo)
+    assert service.handle("42", "Alex", "!addtask Test task") == "Task added for Alex."
+    service._last_seen.clear()
+    assert "1. Test task" in service.handle("42", "Alex", "!tasklist")
+    service._last_seen.clear()
+    assert service.handle("42", "Alex", "!done 1") == "Task completed."
+    service._last_seen.clear()
+    assert "Archived 1" in service.handle("42", "Alex", "!clear")
+    service._last_seen.clear()
+    assert "checked in" in service.handle("42", "Alex", "!checkin")
+    service._last_seen.clear()
+    assert "shape is now" in service.handle("42", "Alex", "!shape circle")
+    service._last_seen.clear()
+    assert "left" in service.handle("42", "Alex", "!leave")
+    service._last_seen.clear()
+    assert "Only the broadcaster" in service.handle("42", "Alex", "!ttimer start 00:30")
+
+
 def test_reopen_and_archive_do_not_reduce_lifetime_completed(tmp_path):
     repo = repository(tmp_path)
     task = repo.add_task("Alex", "Study")

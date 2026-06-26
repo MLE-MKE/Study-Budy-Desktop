@@ -40,6 +40,11 @@ class AuthorizationExpired(TwitchAuthError):
         super().__init__("Authorization expired. Generate a new code and try again.", "expired_token")
 
 
+class AuthorizationSlowDown(TwitchAuthError):
+    def __init__(self) -> None:
+        super().__init__("Twitch asked Study Budy to slow down while waiting for authorization.", "slow_down")
+
+
 class AuthorizationCancelled(TwitchAuthError):
     def __init__(self) -> None:
         super().__init__("Authorization cancelled.", "cancelled")
@@ -99,6 +104,8 @@ class TwitchDeviceAuthClient:
                 raise AuthorizationDenied()
             if code in {"expired_token", "authorization_expired", "expired_device_code"}:
                 raise AuthorizationExpired()
+            if code == "slow_down":
+                raise AuthorizationSlowDown()
             if "invalid" in code and "device" in code:
                 raise TwitchAuthError("The Twitch authorization code is no longer valid.", "invalid_device_code")
             raise TwitchAuthError(self._message(payload, "Twitch authorization failed."), code or "token_error")
@@ -121,6 +128,7 @@ class TwitchDeviceAuthClient:
         status_callback: Callable[[str], None] | None = None,
     ) -> TokenSet:
         deadline = time.monotonic() + device.expires_in
+        interval = max(1, device.interval)
         while time.monotonic() < deadline:
             if cancel_event.is_set():
                 raise AuthorizationCancelled()
@@ -129,7 +137,12 @@ class TwitchDeviceAuthClient:
             except AuthorizationPending:
                 if status_callback:
                     status_callback("Waiting for Twitch authorization")
-                cancel_event.wait(device.interval)
+                cancel_event.wait(min(interval, max(0.1, deadline - time.monotonic())))
+            except AuthorizationSlowDown:
+                interval += 5
+                if status_callback:
+                    status_callback("Waiting for Twitch authorization. Twitch asked Study Budy to slow down.")
+                cancel_event.wait(min(interval, max(0.1, deadline - time.monotonic())))
         raise AuthorizationExpired()
 
     def refresh_tokens(self, refresh_token: str) -> TokenSet:

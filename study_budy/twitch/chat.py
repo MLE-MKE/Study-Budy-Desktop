@@ -13,6 +13,7 @@ from typing import Protocol
 
 from ..commands import ChatCommandService
 from ..storage import TaskRepository, now
+from .transport import NormalizedChatMessage, TwitchHelixChatSender, TwitchIRCChatListener
 
 LOG = logging.getLogger(__name__)
 
@@ -43,10 +44,19 @@ class DryRunChatSender:
 class TwitchChatCoordinator:
     repository: TaskRepository
     sender: ChatSender | None = None
+    credential_store: object | None = None
+    client_id_getter: object | None = None
+    listener: TwitchIRCChatListener | None = None
+    listener_state: str = "Not connected"
+    sender_state: str = "Not connected"
 
     def __post_init__(self) -> None:
+        if self.sender is None and self.credential_store and self.client_id_getter:
+            self.sender = TwitchHelixChatSender(self.repository, self.credential_store, self.client_id_getter)
         self.sender = self.sender or DryRunChatSender()
         self.commands = ChatCommandService(self.repository)
+        self.listener_state = self.repository.get_setting("twitch_listener_status", self.listener_state)
+        self.sender_state = self.repository.get_setting("twitch_sender_status", self.sender_state)
 
     def streamer(self) -> dict | None:
         return self.repository.get_setting(STREAMER_METADATA_KEY, None)
@@ -100,13 +110,73 @@ class TwitchChatCoordinator:
             return "No streamer account connected"
         if not self.monitored_channel():
             return "No monitored channel selected"
-        return f"Authorized for {self.monitored_channel()} (chat transport pending)"
+        return self.listener_state if self.listener_state != "Not connected" else f"Authorized for {self.monitored_channel()}. Chat listener not started."
 
     def sender_status(self) -> str:
         _role, account, warning = self.active_response_account()
         if warning:
             return warning
-        return f"Responses will be sent as: {account['login']} (chat transport pending)"
+        if self.sender_state != "Not connected":
+            return self.sender_state
+        return f"Ready to send as {account['login']}"
+
+    def start_listener(self, credential_store, client_id_getter, status_callback=None) -> str:
+        from .credentials import STREAMER_CREDENTIAL_KEY
+
+        streamer = self.streamer()
+        channel = self.monitored_channel()
+        if not streamer:
+            self.listener_state = "No streamer account connected"
+            return self.listener_state
+        if not channel:
+            self.listener_state = "No monitored channel selected"
+            return self.listener_state
+        tokens = credential_store.load_tokens(STREAMER_CREDENTIAL_KEY)
+        if not tokens:
+            self.listener_state = "Streamer account needs to be reconnected"
+            return self.listener_state
+        self.stop_listener()
+
+        def on_status(status: str) -> None:
+            self.listener_state = status
+            self.repository.set_setting("twitch_listener_status", status)
+            if status_callback:
+                status_callback(status)
+
+        self.listener = TwitchIRCChatListener(
+            channel=channel,
+            login=streamer["login"],
+            access_token=tokens.access_token,
+            on_message=self.handle_live_message,
+            on_status=on_status,
+        )
+        self.listener_state = f"Connecting chat listener for {channel}"
+        self.repository.set_setting("twitch_listener_status", self.listener_state)
+        self.listener.start()
+        LOG.info("Twitch chat listener startup requested")
+        return self.listener_state
+
+    def stop_listener(self) -> None:
+        if self.listener:
+            self.listener.stop()
+        self.listener = None
+
+    def prepare_sender(self, credential_store, client_id_getter) -> str:
+        self.sender = TwitchHelixChatSender(self.repository, credential_store, client_id_getter)
+        _role, account, warning = self.active_response_account()
+        self.sender_state = warning or (f"Ready to send as {account['login']}" if account else "No response account connected")
+        self.repository.set_setting("twitch_sender_status", self.sender_state)
+        return self.sender_state
+
+    def handle_live_message(self, message: NormalizedChatMessage) -> str | None:
+        return self.route_incoming_message(
+            message.channel,
+            message.user_id,
+            message.display_name,
+            message.text,
+            is_broadcaster=message.is_broadcaster,
+            is_moderator=message.is_moderator,
+        )
 
     def test_full_chat_flow(self) -> str:
         client_id = self.repository.get_setting("twitch_client_id", "")
@@ -126,7 +196,7 @@ class TwitchChatCoordinator:
                 + [
                     f"Streamer: Authorized as {streamer['login']}",
                     f"Monitored channel: {channel}",
-                    "Chat listener: Transport pending",
+                    f"Chat listener: {self.listener_status()}",
                     "Command dispatcher: Ready",
                     f"Response account: {warning}",
                     "Chat sender: Not available",
@@ -139,10 +209,10 @@ class TwitchChatCoordinator:
             + [
                 f"Streamer: Authorized as {streamer['login']}",
                 f"Monitored channel: {channel}",
-                "Chat listener: Transport pending",
+                f"Chat listener: {self.listener_status()}",
                 "Command dispatcher: Ready",
                 f"Response account: {sender['login']}",
-                "Chat sender: Transport pending",
+                f"Chat sender: {self.sender_status()}",
             ]
         )
 
@@ -171,7 +241,13 @@ class TwitchChatCoordinator:
         if warning or not account:
             LOG.warning("Command processed, but no chat response account is connected")
             return response
-        self.sender.send_message(self.monitored_channel(), account["login"], f"@{display_name} {response}")
+        try:
+            self.sender.send_message(self.monitored_channel(), account["login"], f"@{display_name} {response}")
+            self.sender_state = f"Ready to send as {account['login']}"
+        except Exception as exc:
+            self.sender_state = f"Chat response failed: {exc}"
+            self.repository.set_setting("twitch_sender_status", self.sender_state)
+            LOG.warning("Command processed, but chat response failed: %s", exc)
         return response
 
 
@@ -186,5 +262,5 @@ def account_metadata(role: str, user, scopes: tuple[str, ...], timestamp: str | 
         "connected_at": stamp,
         "last_validated_at": stamp,
         "authorization_status": "Authorized",
-        "chat_status": "Chat transport pending",
+        "chat_status": "Authorized. Live chat transport is not implemented yet.",
     }
