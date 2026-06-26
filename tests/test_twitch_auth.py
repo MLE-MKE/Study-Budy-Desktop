@@ -7,7 +7,7 @@ import threading
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from study_budy.connections_view import ConnectionsView
+from study_budy.connections_view import CLIENT_ID_HELP_TEXT, ConnectionsView
 from study_budy.storage import TaskRepository
 from study_budy.twitch.api import TwitchAPIClient
 from study_budy.twitch.auth import (
@@ -176,6 +176,58 @@ def test_duplicate_connection_attempt_is_blocked(qapp, repository):
     view.auth_worker = RunningWorker()
     view.connect_streamer()
     assert "already in progress" in view.explanation.text()
+
+
+def test_client_id_help_and_validation(qapp, repository, monkeypatch):
+    view = ConnectionsView(repository, lambda: None)
+    assert "How to Find Your Twitch Client ID" in CLIENT_ID_HELP_TEXT
+    assert "Do not paste your Twitch password" in CLIENT_ID_HELP_TEXT
+    called = []
+    monkeypatch.setattr("study_budy.connections_view.QDesktopServices.openUrl", lambda url: called.append(url.toString()) or True)
+    view.open_developer_console()
+    assert called == ["https://dev.twitch.tv/console/apps"]
+    view.client_id.setText("")
+    view.save_client_id_setting()
+    assert "needs a Twitch Client ID" in view.explanation.text()
+    view.client_id.setText("bad secret")
+    view.save_client_id_setting()
+    assert "does not look valid" in view.explanation.text()
+    view.client_id.setText("a" * 30)
+    view.save_client_id_setting()
+    assert repository.get_setting("twitch_client_id") == "a" * 30
+    assert view.client_id_status.text() == "Configured"
+    assert repository.get_setting("twitch_streamer_account", None) is None
+    assert repository.get_setting("twitch_bot_account", None) is None
+
+
+def test_connect_buttons_are_wired_and_missing_client_id_is_visible(qapp, repository):
+    view = ConnectionsView(repository, lambda: None)
+    view.streamer_connect_streamer_account.click()
+    assert "needs a Twitch Client ID" in view.explanation.text()
+    view.bot_connect_bot_account.click()
+    assert "needs a Twitch Client ID" in view.explanation.text()
+
+
+def test_connection_button_feedback_and_restore(qapp, repository):
+    view = ConnectionsView(repository, lambda: None)
+    view.client_id.setText("a" * 30)
+
+    class FakeWorker:
+        def __init__(self):
+            self._running = True
+
+        def isRunning(self):
+            return self._running
+
+    view.auth_worker = FakeWorker()
+    view.auth_role = "bot"
+    view.refresh()
+    assert view.bot_connect_bot_account.text() == "Connecting..."
+    assert not view.bot_connect_bot_account.isEnabled()
+    view.auth_worker._running = False
+    view.on_auth_finished()
+    assert view.bot_connect_bot_account.text() == "Connect Bot Account"
+    assert view.bot_connect_bot_account.isEnabled()
 
 
 def test_tokens_are_not_stored_in_settings_sqlite_or_logs(repository, caplog):

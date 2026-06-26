@@ -14,7 +14,15 @@ from study_budy.twitch.chat import (
     DryRunChatSender,
     TwitchChatCoordinator,
 )
-from study_budy.twitch.credentials import BOT_CREDENTIAL_KEY, STREAMER_CREDENTIAL_KEY, MemoryTokenCredentialStore
+from study_budy.twitch.credentials import (
+    BOT_ACCESS_KEY,
+    BOT_CREDENTIAL_KEY,
+    BOT_REFRESH_KEY,
+    STREAMER_ACCESS_KEY,
+    STREAMER_CREDENTIAL_KEY,
+    STREAMER_REFRESH_KEY,
+    MemoryTokenCredentialStore,
+)
 from study_budy.twitch.models import REQUIRED_CHAT_SCOPES, TokenSet
 
 
@@ -44,6 +52,10 @@ def test_streamer_and_bot_credentials_remain_separate(tmp_path):
     store.save_tokens(BOT_CREDENTIAL_KEY, TokenSet("bot-access", "bot-refresh", 100, REQUIRED_CHAT_SCOPES))
     assert store.load_tokens(STREAMER_CREDENTIAL_KEY).access_token == "streamer-access"
     assert store.load_tokens(BOT_CREDENTIAL_KEY).access_token == "bot-access"
+    assert STREAMER_ACCESS_KEY != BOT_ACCESS_KEY
+    assert STREAMER_REFRESH_KEY != BOT_REFRESH_KEY
+    assert store.secret_entries[STREAMER_ACCESS_KEY] == "streamer-access"
+    assert store.secret_entries[BOT_ACCESS_KEY] == "bot-access"
 
 
 def test_connecting_each_role_does_not_overwrite_the_other(tmp_path):
@@ -123,14 +135,16 @@ def test_disconnect_behaviors_and_same_account_warning(tmp_path):
 def test_full_chat_flow_reports_failure_states_and_success(tmp_path):
     repository = repo(tmp_path)
     chat = TwitchChatCoordinator(repository)
-    assert chat.test_full_chat_flow() == "No monitored channel is selected."
+    assert "Client ID: Not configured" in chat.test_full_chat_flow()
+    repository.set_setting("twitch_client_id", "a" * 30)
+    assert "No monitored channel is selected" in chat.test_full_chat_flow()
     repository.set_setting(MONITORED_CHANNEL_KEY, "killer_queen55")
     assert "Streamer authorization is required" in chat.test_full_chat_flow()
     repository.set_setting(STREAMER_METADATA_KEY, account("streamer", "killer_queen55", "1"))
     chat.set_response_mode(RESPONSE_MODE_BOT)
-    assert chat.test_full_chat_flow() == "Streamer authorization is valid, but no chat sender is available."
+    assert "Chat sender: Not available" in chat.test_full_chat_flow()
     repository.set_setting(BOT_METADATA_KEY, account("bot", "killer_queens_jester", "2"))
-    assert chat.test_full_chat_flow() == "Chat is ready. Listening in killer_queen55 and responding as killer_queens_jester."
+    assert "Response account: killer_queens_jester" in chat.test_full_chat_flow()
     repository.set_setting(MONITORED_CHANNEL_KEY, "wrong_channel")
     assert "wrong_channel" in chat.test_full_chat_flow()
 

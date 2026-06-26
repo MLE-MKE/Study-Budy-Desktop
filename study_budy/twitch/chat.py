@@ -100,27 +100,51 @@ class TwitchChatCoordinator:
             return "No streamer account connected"
         if not self.monitored_channel():
             return "No monitored channel selected"
-        return f"Ready to listen in {self.monitored_channel()} (chat transport pending)"
+        return f"Authorized for {self.monitored_channel()} (chat transport pending)"
 
     def sender_status(self) -> str:
         _role, account, warning = self.active_response_account()
         if warning:
             return warning
-        return f"Responses will be sent as: {account['login']}"
+        return f"Responses will be sent as: {account['login']} (chat transport pending)"
 
     def test_full_chat_flow(self) -> str:
+        client_id = self.repository.get_setting("twitch_client_id", "")
         channel = self.monitored_channel()
         streamer = self.streamer()
+        lines = [f"Client ID: {'Configured' if client_id else 'Not configured'}"]
+        if not client_id:
+            return "\n".join(lines + ["Streamer: Not tested", "Result: Add a Twitch Client ID first."])
         if not channel:
-            return "No monitored channel is selected."
+            return "\n".join(lines + ["Monitored channel: Not selected", "Result: No monitored channel is selected."])
         if not streamer:
-            return "Streamer authorization is required before Study Budy can listen to chat."
+            return "\n".join(lines + ["Streamer: Not authorized", f"Monitored channel: {channel}", "Result: Streamer authorization is required before Study Budy can listen to chat."])
         _role, sender, warning = self.active_response_account()
         if warning:
-            return "Streamer authorization is valid, but no chat sender is available."
+            return "\n".join(
+                lines
+                + [
+                    f"Streamer: Authorized as {streamer['login']}",
+                    f"Monitored channel: {channel}",
+                    "Chat listener: Transport pending",
+                    "Command dispatcher: Ready",
+                    f"Response account: {warning}",
+                    "Chat sender: Not available",
+                ]
+            )
         if channel != streamer.get("login", "").casefold():
-            return f"Study Budy is configured to listen in {channel}. Streamer channel is {streamer.get('login', '')}."
-        return f"Chat is ready. Listening in {channel} and responding as {sender['login']}."
+            return "\n".join(lines + [f"Streamer: Authorized as {streamer['login']}", f"Monitored channel: {channel}", f"Result: Study Budy is configured to listen in {channel}. Streamer channel is {streamer.get('login', '')}."])
+        return "\n".join(
+            lines
+            + [
+                f"Streamer: Authorized as {streamer['login']}",
+                f"Monitored channel: {channel}",
+                "Chat listener: Transport pending",
+                "Command dispatcher: Ready",
+                f"Response account: {sender['login']}",
+                "Chat sender: Transport pending",
+            ]
+        )
 
     def route_incoming_message(
         self,

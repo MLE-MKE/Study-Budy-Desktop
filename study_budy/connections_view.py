@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import threading
+import logging
+import re
 from datetime import datetime, timezone
 
 from PySide6.QtCore import Qt, QThread, QTimer, QUrl, Signal, Slot
@@ -10,6 +12,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -44,6 +47,31 @@ from .twitch.models import DeviceCode, REQUIRED_CHAT_SCOPES, TokenSet, missing_r
 
 
 ROLE_LABELS = {"streamer": "Streamer", "bot": "Bot"}
+LOG = logging.getLogger(__name__)
+CLIENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9]{20,80}$")
+CLIENT_ID_HELP_TEXT = """How to Find Your Twitch Client ID
+
+1. Sign into the Twitch account that will own the Study Budy developer application.
+2. Open the Twitch Developer Console.
+3. Enable two-factor authentication on that Twitch account if Twitch requires it.
+4. Open the Applications section.
+5. Choose Register Your Application.
+6. Enter an application name such as Study Budy Desktop.
+7. Enter the OAuth redirect URL required by the Twitch registration form.
+8. Select the most appropriate application category.
+9. Create the application.
+10. Open Manage for the new application.
+11. Copy the value labeled Client ID.
+12. Return to Study Budy.
+13. Paste it into the Twitch Client ID field.
+14. Click Save Client ID.
+
+The Client ID identifies the Study Budy application. It does not connect a Twitch account by itself.
+
+Do not paste your Twitch password, access token, refresh token, or Client Secret into this field.
+
+The same Client ID is used to authorize both your streamer account and your optional bot account.
+"""
 
 
 class TwitchAuthWorker(QThread):
@@ -105,16 +133,36 @@ class ConnectionsView(QWidget):
         title.setObjectName("H1")
         self.root.addWidget(title)
 
+        client_card = self._card()
+        client_layout = QVBoxLayout(client_card)
+        client_layout.setContentsMargins(Theme.CARD_PADDING, Theme.CARD_PADDING, Theme.CARD_PADDING, Theme.CARD_PADDING)
+        title_row = QHBoxLayout()
+        app_title = QLabel("Twitch Application")
+        app_title.setObjectName("H2")
+        self.client_id_status = QLabel("Not Configured")
+        self.client_id_status.setObjectName("StatusBad")
+        title_row.addWidget(app_title)
+        title_row.addStretch(1)
+        title_row.addWidget(self.client_id_status)
+        client_layout.addLayout(title_row)
+        client_box = QGridLayout()
+        client_box.setContentsMargins(Theme.CARD_PADDING, Theme.CARD_PADDING, Theme.CARD_PADDING, Theme.CARD_PADDING)
+        self.client_id_help = QPushButton("?")
+        self.client_id_help.setFixedWidth(42)
+        self.client_id_help.clicked.connect(self.show_client_id_help)
         self.client_id = QLineEdit(self.repository.get_setting("twitch_client_id", ""))
         self.client_id.setPlaceholderText("Twitch Client ID")
         self.save_client_id = QPushButton("Save Client ID")
         self.save_client_id.clicked.connect(self.save_client_id_setting)
-        client_card = self._card()
-        client_box = QGridLayout(client_card)
-        client_box.setContentsMargins(Theme.CARD_PADDING, Theme.CARD_PADDING, Theme.CARD_PADDING, Theme.CARD_PADDING)
         client_box.addWidget(QLabel("Twitch Client ID"), 0, 0)
-        client_box.addWidget(self.client_id, 0, 1)
-        client_box.addWidget(self.save_client_id, 0, 2)
+        client_box.addWidget(self.client_id_help, 0, 1)
+        client_box.addWidget(self.client_id, 0, 2)
+        client_box.addWidget(self.save_client_id, 0, 3)
+        client_layout.addLayout(client_box)
+        explanation = QLabel("The Client ID identifies Study Budy to Twitch. It is created in the Twitch Developer Console and is not your username, password, or OAuth token.")
+        explanation.setObjectName("SmallNote")
+        explanation.setWordWrap(True)
+        client_layout.addWidget(explanation)
         self.root.addWidget(client_card)
 
         self.streamer_card, self.streamer_fields = self._account_card(
@@ -312,8 +360,55 @@ class ConnectionsView(QWidget):
         self.root.addWidget(card)
 
     def save_client_id_setting(self) -> None:
-        self.repository.set_setting("twitch_client_id", self.client_id.text().strip())
+        client_id = self.client_id.text().strip()
+        if not client_id:
+            self.flow_result.setText("Study Budy needs a Twitch Client ID before it can connect an account. Click the ? icon for setup instructions.")
+            self.update_client_id_status()
+            return
+        if not CLIENT_ID_PATTERN.match(client_id):
+            self.flow_result.setText("That Twitch Client ID does not look valid. Copy the Client ID from the Twitch Developer Console.")
+            self.update_client_id_status()
+            return
+        self.repository.set_setting("twitch_client_id", client_id)
+        saved = self.repository.get_setting("twitch_client_id", "")
+        if saved != client_id:
+            self.flow_result.setText("Twitch Client ID could not be saved. Check the application log for details.")
+            LOG.error("Twitch Client ID failed storage round trip.")
+            return
         self.flow_result.setText("Twitch Client ID saved.")
+        self.update_client_id_status()
+
+    def update_client_id_status(self) -> None:
+        configured = bool(self.repository.get_setting("twitch_client_id", "").strip())
+        self.client_id_status.setText("Configured" if configured else "Not Configured")
+        self.client_id_status.setObjectName("StatusGood" if configured else "StatusBad")
+        self.client_id_status.style().unpolish(self.client_id_status)
+        self.client_id_status.style().polish(self.client_id_status)
+
+    def show_client_id_help(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("How to Find Your Twitch Client ID")
+        layout = QVBoxLayout(dialog)
+        text = QTextBrowser()
+        text.setPlainText(CLIENT_ID_HELP_TEXT)
+        text.setMinimumSize(620, 420)
+        layout.addWidget(text)
+        buttons = QHBoxLayout()
+        copy = QPushButton("Copy Developer Console Instructions")
+        copy.clicked.connect(lambda: QApplication.clipboard().setText(CLIENT_ID_HELP_TEXT))
+        open_console = QPushButton("Open Twitch Developer Console")
+        open_console.clicked.connect(self.open_developer_console)
+        close = QPushButton("Close")
+        close.clicked.connect(dialog.accept)
+        buttons.addWidget(copy)
+        buttons.addWidget(open_console)
+        buttons.addWidget(close)
+        layout.addLayout(buttons)
+        dialog.exec()
+
+    def open_developer_console(self) -> None:
+        if not QDesktopServices.openUrl(QUrl("https://dev.twitch.tv/console/apps")):
+            self.flow_result.setText("Study Budy could not open the Twitch Developer Console.")
 
     def save_chat_configuration(self) -> None:
         self.chat.set_monitored_channel(self.monitored_channel.text())
@@ -321,20 +416,29 @@ class ConnectionsView(QWidget):
         self.refresh()
 
     def connect_account(self, role: str) -> None:
+        LOG.info("%s account connection requested", ROLE_LABELS[role])
         if self.auth_worker and self.auth_worker.isRunning():
             self.flow_result.setText("A Twitch authorization is already in progress.")
             return
-        self.save_client_id_setting()
-        client_id = self.client_id.text().strip()
+        client_id = self.client_id.text().strip() or self.repository.get_setting("twitch_client_id", "")
         if not client_id:
-            self.flow_result.setText("Enter a Twitch Client ID before connecting.")
+            self.flow_result.setText("Study Budy needs a Twitch Client ID before it can connect an account. Click the ? icon for setup instructions.")
             return
+        if not CLIENT_ID_PATTERN.match(client_id):
+            self.flow_result.setText("That Twitch Client ID does not look valid. Click the ? icon for setup instructions.")
+            return
+        self.repository.set_setting("twitch_client_id", client_id)
+        self.update_client_id_status()
         self.auth_role = role
         self.current_device = None
         self.code_started_at = None
         self.user_code.setText("--------")
         self.auth_title.setText(f"Authorize Study Budy {ROLE_LABELS[role]} Account")
-        self.auth_hint.setText("Sign into the Twitch account you want to use as the bot." if role == "bot" else "Sign into the Twitch account that owns the channel Study Budy should monitor.")
+        self.auth_hint.setText(
+            "Sign into the Twitch account you want to use as the Study Budy bot. Do not authorize your streamer account unless you want both roles to use the same account."
+            if role == "bot"
+            else "Sign into the Twitch account that owns the channel you want Study Budy to monitor."
+        )
         self.auth_status.setText(f"Requesting Twitch authorization for {role} account...")
         self.auth_worker = TwitchAuthWorker(role, client_id, REQUIRED_CHAT_SCOPES)
         self.auth_worker.code_ready.connect(self.on_code_ready)
@@ -342,8 +446,9 @@ class ConnectionsView(QWidget):
         self.auth_worker.authorized.connect(self.on_authorized)
         self.auth_worker.failed.connect(self.on_auth_failed)
         self.auth_worker.finished.connect(self.on_auth_finished)
-        getattr(self, f"{role}_connect_{ROLE_LABELS[role].lower()}_account").setEnabled(False)
-        getattr(self, f"{role}_connect_{ROLE_LABELS[role].lower()}_account").setText("Connecting...")
+        self._connection_button(role).setEnabled(False)
+        self._connection_button(role).setText("Connecting...")
+        self.auth_card.setVisible(True)
         self.auth_worker.start()
         self.refresh()
 
@@ -363,7 +468,8 @@ class ConnectionsView(QWidget):
         if not self.current_device:
             self.flow_result.setText("Study Budy is still waiting for Twitch to create a code.")
             return
-        QDesktopServices.openUrl(QUrl(self.current_device.verification_uri))
+        if not QDesktopServices.openUrl(QUrl(self.current_device.verification_uri)):
+            self.flow_result.setText("Study Budy could not open the Twitch authorization page.")
 
     def copy_code(self) -> None:
         QApplication.clipboard().setText(self.user_code.text())
@@ -374,6 +480,7 @@ class ConnectionsView(QWidget):
             self.auth_worker.cancel()
         self.countdown.stop()
         self.auth_status.setText("Authorization cancelled")
+        self.flow_result.setText("Authorization cancelled.")
         self.refresh()
 
     @Slot(object)
@@ -417,6 +524,8 @@ class ConnectionsView(QWidget):
         self.countdown.stop()
 
     def on_auth_finished(self) -> None:
+        self.auth_worker = None
+        self.auth_role = None
         self.refresh()
 
     def update_countdown(self) -> None:
@@ -469,6 +578,7 @@ class ConnectionsView(QWidget):
         streamer = self.repository.get_setting(STREAMER_METADATA_KEY, None)
         bot = self.repository.get_setting(BOT_METADATA_KEY, None)
         self.client_id.setText(self.repository.get_setting("twitch_client_id", ""))
+        self.update_client_id_status()
         self.monitored_channel.setText(self.chat.monitored_channel())
         self.response_mode.setCurrentText(self.chat.response_mode())
         self._fill_account("streamer", streamer, self.streamer_fields)
@@ -479,9 +589,10 @@ class ConnectionsView(QWidget):
         self.sender_status.setText(self.chat.sender_status())
         self.auth_card.setVisible(bool(self.auth_worker and self.auth_worker.isRunning()))
         for role in ("streamer", "bot"):
-            button = getattr(self, f"{role}_connect_{ROLE_LABELS[role].lower()}_account")
-            button.setEnabled(not bool(self.auth_worker and self.auth_worker.isRunning()))
-            button.setText(f"Connect {ROLE_LABELS[role]} Account")
+            button = self._connection_button(role)
+            running = bool(self.auth_worker and self.auth_worker.isRunning())
+            button.setEnabled(not running)
+            button.setText("Connecting..." if running and self.auth_role == role else f"Connect {ROLE_LABELS[role]} Account")
 
     def _fill_account(self, role: str, account: dict | None, fields: dict[str, QLineEdit]) -> None:
         status = getattr(self, f"{role}_status_label")
@@ -525,3 +636,6 @@ class ConnectionsView(QWidget):
         card = QFrame()
         card.setObjectName("Card")
         return card
+
+    def _connection_button(self, role: str) -> QPushButton:
+        return getattr(self, f"{role}_connect_{ROLE_LABELS[role].lower()}_account")
