@@ -2,8 +2,8 @@ const root = document.getElementById("timer-root");
 const display = document.getElementById("timer-display");
 
 let latest = null;
-let localServerTimestamp = 0;
 let localReceivedAt = Date.now() / 1000;
+let lastAppearanceEventId = null;
 
 function formatDuration(seconds) {
   const safe = Math.max(0, Math.floor(seconds));
@@ -16,39 +16,59 @@ function formatDuration(seconds) {
   return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
+function validColor(value, fallback) {
+  return /^#[0-9A-Fa-f]{6}$/.test(value || "") ? value : fallback;
+}
+
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(min, Math.min(max, number));
+}
+
 function hexAlpha(percent) {
   const value = Math.round(Math.max(0, Math.min(100, Number(percent))) * 2.55);
   return value.toString(16).padStart(2, "0");
 }
 
 function applyAppearance(appearance) {
+  if (!appearance || typeof appearance !== "object") return;
   const horizontal = appearance.horizontal_align || "center";
   const vertical = appearance.vertical_align || "center";
   root.style.justifyContent = horizontal === "left" ? "flex-start" : horizontal === "right" ? "flex-end" : "center";
   root.style.alignItems = vertical === "top" ? "flex-start" : vertical === "bottom" ? "flex-end" : "center";
-  root.style.padding = `${Number(appearance.padding || 0)}px`;
+  root.style.padding = `${clampNumber(appearance.padding, 0, 200, 8)}px`;
 
-  display.style.fontFamily = `"${appearance.font_family || "Press Start 2P"}", Consolas, monospace`;
-  display.style.fontSize = `${Number(appearance.font_size || 96)}px`;
-  display.style.fontWeight = appearance.font_weight || "700";
-  display.style.color = appearance.text_color || "#ffffff";
-  display.style.opacity = String(Math.max(0, Math.min(100, Number(appearance.text_opacity ?? 100))) / 100);
-  display.style.letterSpacing = `${Number(appearance.letter_spacing || 0)}px`;
-  display.style.padding = `${Number(appearance.padding || 0)}px`;
-  display.style.borderRadius = `${Number(appearance.corner_radius || 0)}px`;
+  const font = String(appearance.font_family || "Segoe UI").replace(/["\\]/g, "");
+  const textColor = validColor(appearance.text_color, "#FFFFFF");
+  const opacity = clampNumber(appearance.text_opacity, 0, 100, 100) / 100;
+  const padding = clampNumber(appearance.padding, 0, 200, 8);
+  const radius = clampNumber(appearance.corner_radius, 0, 100, 8);
+  root.style.setProperty("--timer-font-family", `"${font}"`);
+  root.style.setProperty("--timer-font-size", `${clampNumber(appearance.font_size, 16, 300, 96)}px`);
+  root.style.setProperty("--timer-font-weight", `${clampNumber(appearance.font_weight, 100, 900, 700)}`);
+  root.style.setProperty("--timer-text-color", textColor);
+  root.style.setProperty("--timer-text-opacity", `${opacity}`);
+  root.style.setProperty("--timer-letter-spacing", `${clampNumber(appearance.letter_spacing, -10, 30, 0)}px`);
+  root.style.setProperty("--timer-padding", `${padding}px`);
+  root.style.setProperty("--timer-corner-radius", `${radius}px`);
   if (appearance.background_enabled) {
-    display.style.backgroundColor = `${appearance.background_color || "#000000"}${hexAlpha(appearance.background_opacity ?? 45)}`;
+    root.style.setProperty("--timer-background-color", `${validColor(appearance.background_color, "#000000")}${hexAlpha(appearance.background_opacity ?? 0)}`);
   } else {
-    display.style.backgroundColor = "transparent";
+    root.style.setProperty("--timer-background-color", "transparent");
   }
 
-  const outlineWidth = Number(appearance.outline_width || 0);
+  const outlineWidth = clampNumber(appearance.outline_width, 0, 12, 0);
   const outlineMode = appearance.outline_mode || "black";
-  const outlineColor = outlineMode === "white" ? "#ffffff" : outlineMode === "black" ? "#000000" : appearance.outline_color || "#000000";
+  const outlineColor = outlineMode === "white" ? "#FFFFFF" : outlineMode === "black" ? "#000000" : validColor(appearance.outline_color, "#000000");
   if (outlineMode === "none" || outlineWidth <= 0) {
+    root.style.setProperty("--timer-outline-width", "0px");
+    root.style.setProperty("--timer-outline-color", "transparent");
     display.style.webkitTextStroke = "0 transparent";
     display.style.textShadow = "none";
   } else {
+    root.style.setProperty("--timer-outline-width", `${outlineWidth}px`);
+    root.style.setProperty("--timer-outline-color", outlineColor);
     display.style.webkitTextStroke = `${outlineWidth}px ${outlineColor}`;
     display.style.textShadow = `0 0 ${outlineWidth + 1}px ${outlineColor}`;
   }
@@ -78,9 +98,12 @@ async function refresh() {
   try {
     const response = await fetch("/api/timer", { cache: "no-store" });
     latest = await response.json();
-    localServerTimestamp = latest.server_timestamp || 0;
     localReceivedAt = Date.now() / 1000;
-    applyAppearance(latest.appearance || {});
+    const event = latest.appearance_event || {};
+    if (event.event_id !== lastAppearanceEventId || latest.appearance) {
+      applyAppearance(event.appearance || latest.appearance || {});
+      lastAppearanceEventId = event.event_id;
+    }
     render();
   } catch (error) {
     // Keep the last known state visible if OBS briefly disconnects.
@@ -88,5 +111,5 @@ async function refresh() {
 }
 
 refresh();
-setInterval(refresh, 5000);
+setInterval(refresh, 1000);
 setInterval(render, 250);

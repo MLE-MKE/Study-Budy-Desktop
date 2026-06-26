@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, send_from_directory
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 from .checkin import CheckInService
 from .storage import TaskRepository
@@ -25,6 +25,14 @@ def create_overlay_app(repository: TaskRepository) -> Flask:
     checkins = CheckInService(repository)
     timer = TimerService(repository)
     overlay_dir = Path(__file__).with_name("overlay")
+
+    @app.after_request
+    def no_cache_timer(response):
+        if request.path.startswith(("/timer", "/api/timer")):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
 
     @app.get("/health")
     def health():

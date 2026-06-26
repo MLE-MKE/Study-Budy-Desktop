@@ -3,13 +3,17 @@ from __future__ import annotations
 import time
 
 import pytest
+from PySide6.QtWidgets import QApplication
 
 from study_budy.commands import ChatCommandService
 from study_budy.overlay_service import create_overlay_app
+from study_budy.server import OverlayServer
 from study_budy.storage import TaskRepository
 from study_budy.timer import service as timer_service_module
+from study_budy.timer.models import DEFAULT_TIMER_APPEARANCE
 from study_budy.timer.parser import TimerParseError, format_duration, parse_duration
 from study_budy.timer.service import TimerService
+from study_budy.timer_view import TimerView
 
 
 @pytest.fixture
@@ -18,6 +22,11 @@ def repository(tmp_path):
     repo.initialize()
     timer_service_module._RESTORED_REPOSITORIES.clear()
     return repo
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    return QApplication.instance() or QApplication([])
 
 
 @pytest.mark.parametrize(
@@ -163,3 +172,62 @@ def test_no_black_and_no_outline_modes_are_supported(repository):
     timer = TimerService(repository)
     assert timer.set_appearance({"outline_mode": "black", "outline_width": 4})["outline_mode"] == "black"
     assert timer.set_appearance({"outline_mode": "none", "outline_width": 0})["outline_width"] == 0
+
+
+def test_timer_appearance_save_pipeline_and_storage_isolation(repository):
+    repository.set_setting("appearance", {"text_color": "#111111"})
+    repository.set_setting("checkin_appearance", {"name_color": "#222222"})
+    timer = TimerService(repository)
+    before = timer.state()
+    saved = timer.set_appearance(
+        {
+            "font_family": "Press Start 2P",
+            "font_size": 144,
+            "text_color": "a855f7",
+            "outline_mode": "white",
+            "outline_width": 5,
+            "background_enabled": True,
+            "background_color": "#123456",
+            "background_opacity": 33,
+        }
+    )
+    assert saved["text_color"] == "#A855F7"
+    assert saved["outline_color"] == "#FFFFFF"
+    assert repository.get_setting("timer.appearance.text_color") == "#A855F7"
+    assert repository.get_setting("timer.appearance.font_family") == "Press Start 2P"
+    assert repository.get_setting("timer.appearance.font_size") == 144
+    assert repository.get_setting("timer.appearance.outline_mode") == "white"
+    assert repository.get_setting("timer.appearance.outline_width") == 5
+    assert repository.get_setting("appearance") == {"text_color": "#111111"}
+    assert repository.get_setting("checkin_appearance") == {"name_color": "#222222"}
+    assert timer.state()["remaining_seconds"] == before["remaining_seconds"]
+
+
+def test_timer_api_returns_appearance_event_and_no_store_cache(repository):
+    timer = TimerService(repository)
+    timer.set_appearance({"text_color": "#A855F7"})
+    client = create_overlay_app(repository).test_client()
+    response = client.get("/api/timer")
+    payload = response.get_json()
+    assert response.headers["Cache-Control"].startswith("no-store")
+    assert payload["appearance_event"]["type"] == "timer_appearance"
+    assert payload["appearance_event"]["appearance"]["text_color"] == "#A855F7"
+    assert client.get("/timer").headers["Cache-Control"].startswith("no-store")
+
+
+def test_timer_view_dirty_save_reset_and_reopen(qapp, repository):
+    server = OverlayServer(repository)
+    view = TimerView(repository, server, {"start": lambda: None, "stop": lambda: None, "restart": lambda: None})
+    assert not view.save_button.isEnabled()
+    view.text_color.setText("#A855F7")
+    assert view.dirty
+    assert view.save_button.isEnabled()
+    view.save_appearance()
+    assert not view.dirty
+    assert not view.save_button.isEnabled()
+    assert view.control_message.text() == "Timer appearance settings saved."
+    assert TimerService(repository).appearance()["text_color"] == "#A855F7"
+    reopened = TimerView(repository, server, {"start": lambda: None, "stop": lambda: None, "restart": lambda: None})
+    assert reopened.text_color.text() == "#A855F7"
+    reopened.reset_appearance()
+    assert TimerService(repository).appearance()["text_color"] == DEFAULT_TIMER_APPEARANCE["text_color"]

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+
 from PySide6.QtCore import Qt, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -21,6 +23,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from PySide6.QtCore import QSignalBlocker
 
 from .icons import icon
 from .server import OverlayServer
@@ -31,6 +34,7 @@ from .timer.service import TimerService
 
 
 FONT_OPTIONS = ("Press Start 2P", "Segoe UI", "Arial", "Comic Sans MS", "Consolas", "Impact")
+LOG = logging.getLogger(__name__)
 
 
 class TimerView(QWidget):
@@ -40,6 +44,8 @@ class TimerView(QWidget):
         self.overlay_server = overlay_server
         self.callbacks = callbacks
         self.timer = TimerService(repository)
+        self.dirty = False
+        self.loading_controls = False
 
         root = QHBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
@@ -128,6 +134,10 @@ class TimerView(QWidget):
         self.big_timer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.big_timer.setStyleSheet(f"font-size: 54px; font-weight: 900; color: {Theme.PURPLE};")
         layout.addWidget(self.big_timer)
+        self.preview_timer = QLabel("05:00")
+        self.preview_timer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_timer.setStyleSheet("font-size: 64px; font-weight: 900; padding: 18px;")
+        layout.addWidget(self.preview_timer)
         input_row = QHBoxLayout()
         input_row.addWidget(QLabel("Time input"))
         self.duration_input = QLineEdit("30:00")
@@ -218,14 +228,19 @@ class TimerView(QWidget):
         layout.addWidget(self.hide_when_inactive)
         layout.addWidget(self.continue_after_restart)
         buttons = QHBoxLayout()
-        save = QPushButton("Save Timer Appearance")
-        save.setObjectName("PrimaryButton")
-        save.clicked.connect(self.save_appearance)
+        self.save_button = QPushButton("Save Timer Appearance")
+        self.save_button.setObjectName("PrimaryButton")
+        self.save_button.clicked.connect(self.save_appearance)
+        self.save_button.setEnabled(False)
         reset = QPushButton("Reset Timer Appearance to Defaults")
         reset.clicked.connect(self.reset_appearance)
-        buttons.addWidget(save)
+        buttons.addWidget(self.save_button)
         buttons.addWidget(reset)
         layout.addLayout(buttons)
+        self.dirty_label = QLabel("")
+        self.dirty_label.setObjectName("SmallNote")
+        layout.addWidget(self.dirty_label)
+        self._connect_appearance_signals()
         self.main.addWidget(card)
 
     def _build_instructions_card(self) -> None:
@@ -269,60 +284,63 @@ class TimerView(QWidget):
         self.remaining.setText(format_duration(state["remaining_seconds"]))
         self.big_timer.setText(format_duration(state["remaining_seconds"]))
         self.timer_url.setText(self.overlay_server.timer_url)
-        self.load_appearance()
+        if not self.dirty:
+            self.load_appearance()
+        self.apply_preview(self.collect_appearance())
 
     def load_appearance(self) -> None:
+        self.loading_controls = True
         values = self.timer.appearance()
-        self.font_family.setCurrentText(values["font_family"])
-        self.font_size.setValue(int(values["font_size"]))
-        self.font_weight.setCurrentText(str(values["font_weight"]))
-        self.text_color.setText(values["text_color"])
-        self.outline_mode.setCurrentText(values["outline_mode"])
-        self.outline_color.setText(values["outline_color"])
-        self.outline_width.setValue(int(values["outline_width"]))
-        self.text_opacity.setValue(int(values["text_opacity"]))
-        self.letter_spacing.setValue(int(values["letter_spacing"]))
-        self.background_enabled.setChecked(bool(values["background_enabled"]))
-        self.background_color.setText(values["background_color"])
-        self.background_opacity.setValue(int(values["background_opacity"]))
-        self.padding.setValue(int(values["padding"]))
-        self.corner_radius.setValue(int(values["corner_radius"]))
-        self.horizontal_align.setCurrentText(values["horizontal_align"])
-        self.vertical_align.setCurrentText(values["vertical_align"])
-        self.completion_animation.setCurrentText(values["completion_animation"])
-        self.hide_when_inactive.setChecked(bool(values["hide_when_inactive"]))
-        self.continue_after_restart.setChecked(bool(self.timer.state()["continue_after_restart"]))
+        blockers = [QSignalBlocker(widget) for widget in self._appearance_widgets()]
+        try:
+            self.font_family.setCurrentText(values["font_family"])
+            self.font_size.setValue(int(values["font_size"]))
+            self.font_weight.setCurrentText(str(values["font_weight"]))
+            self.text_color.setText(values["text_color"])
+            self.outline_mode.setCurrentText(values["outline_mode"])
+            self.outline_color.setText(values["outline_color"])
+            self.outline_width.setValue(int(values["outline_width"]))
+            self.text_opacity.setValue(int(values["text_opacity"]))
+            self.letter_spacing.setValue(int(values["letter_spacing"]))
+            self.background_enabled.setChecked(bool(values["background_enabled"]))
+            self.background_color.setText(values["background_color"])
+            self.background_opacity.setValue(int(values["background_opacity"]))
+            self.padding.setValue(int(values["padding"]))
+            self.corner_radius.setValue(int(values["corner_radius"]))
+            self.horizontal_align.setCurrentText(values["horizontal_align"])
+            self.vertical_align.setCurrentText(values["vertical_align"])
+            self.completion_animation.setCurrentText(values["completion_animation"])
+            self.hide_when_inactive.setChecked(bool(values["hide_when_inactive"]))
+            self.continue_after_restart.setChecked(bool(self.timer.state()["continue_after_restart"]))
+        finally:
+            del blockers
+            self.loading_controls = False
+        self.apply_preview(values)
 
     def save_appearance(self) -> None:
-        self.timer.set_appearance(
-            {
-                "font_family": self.font_family.currentText(),
-                "font_size": self.font_size.value(),
-                "font_weight": self.font_weight.currentText(),
-                "text_color": self.text_color.text().strip(),
-                "outline_mode": self.outline_mode.currentText(),
-                "outline_color": self.outline_color.text().strip(),
-                "outline_width": self.outline_width.value(),
-                "text_opacity": self.text_opacity.value(),
-                "letter_spacing": self.letter_spacing.value(),
-                "background_enabled": self.background_enabled.isChecked(),
-                "background_color": self.background_color.text().strip(),
-                "background_opacity": self.background_opacity.value(),
-                "padding": self.padding.value(),
-                "corner_radius": self.corner_radius.value(),
-                "horizontal_align": self.horizontal_align.currentText(),
-                "vertical_align": self.vertical_align.currentText(),
-                "completion_animation": self.completion_animation.currentText(),
-                "hide_when_inactive": self.hide_when_inactive.isChecked(),
-            }
-        )
-        self.timer.set_continue_after_restart(self.continue_after_restart.isChecked())
-        self.control_message.setText("Timer appearance saved. Open timer overlays will update on their next sync.")
+        self.save_button.setEnabled(False)
+        try:
+            normalized = self.timer.set_appearance(self.collect_appearance())
+            self.timer.set_continue_after_restart(self.continue_after_restart.isChecked())
+            self.dirty = False
+            self.dirty_label.setText("")
+            self.control_message.setText("Timer appearance settings saved.")
+            self.apply_preview(normalized)
+        except Exception:
+            LOG.exception("Timer appearance settings could not be saved.")
+            self.save_button.setEnabled(True)
+            self.control_message.setText("Timer appearance settings could not be saved. Check the application log for details.")
+        else:
+            self.save_button.setEnabled(False)
 
     def reset_appearance(self) -> None:
-        self.timer.reset_appearance()
+        values = self.timer.reset_appearance()
         self.load_appearance()
-        self.control_message.setText("Timer appearance reset to defaults.")
+        self.dirty = False
+        self.save_button.setEnabled(False)
+        self.dirty_label.setText("")
+        self.apply_preview(values)
+        self.control_message.setText("Timer appearance settings saved.")
 
     def start_timer(self) -> None:
         self._run_action(lambda: self.timer.start(self.duration_input.text()), "Timer started.")
@@ -382,7 +400,78 @@ class TimerView(QWidget):
     def pick_color(self, field: QLineEdit) -> None:
         color = QColorDialog.getColor()
         if color.isValid():
-            field.setText(color.name())
+            field.setText(color.name(QColor.NameFormat.HexRgb).upper())
+
+    def collect_appearance(self) -> dict:
+        return {
+            "font_family": self.font_family.currentText(),
+            "font_size": self.font_size.value(),
+            "font_weight": int(self.font_weight.currentText()),
+            "text_color": self.text_color.text().strip(),
+            "outline_mode": self.outline_mode.currentText(),
+            "outline_color": self.outline_color.text().strip(),
+            "outline_width": self.outline_width.value(),
+            "text_opacity": self.text_opacity.value(),
+            "letter_spacing": self.letter_spacing.value(),
+            "background_enabled": self.background_enabled.isChecked(),
+            "background_color": self.background_color.text().strip(),
+            "background_opacity": self.background_opacity.value(),
+            "padding": self.padding.value(),
+            "corner_radius": self.corner_radius.value(),
+            "horizontal_align": self.horizontal_align.currentText(),
+            "vertical_align": self.vertical_align.currentText(),
+            "completion_animation": self.completion_animation.currentText(),
+            "hide_when_inactive": self.hide_when_inactive.isChecked(),
+        }
+
+    def mark_dirty(self) -> None:
+        if self.loading_controls:
+            return
+        self.dirty = True
+        self.save_button.setEnabled(True)
+        self.dirty_label.setText("Unsaved changes")
+        self.apply_preview(self.timer.normalize_appearance(self.collect_appearance()))
+
+    def apply_preview(self, appearance: dict) -> None:
+        values = self.timer.normalize_appearance(appearance)
+        outline_width = values["outline_width"]
+        outline_color = values["outline_color"]
+        background = "transparent"
+        if values["background_enabled"]:
+            alpha = round(values["background_opacity"] * 2.55)
+            background = f"{values['background_color']}{alpha:02X}"
+        stroke = "none" if values["outline_mode"] == "none" or outline_width <= 0 else f"0 0 {outline_width + 1}px {outline_color}"
+        self.preview_timer.setStyleSheet(
+            f"font-family: '{values['font_family']}', Consolas, monospace;"
+            f"font-size: {values['font_size']}px;"
+            f"font-weight: {values['font_weight']};"
+            f"color: {values['text_color']};"
+            f"opacity: {values['text_opacity'] / 100};"
+            f"letter-spacing: {values['letter_spacing']}px;"
+            f"background: {background};"
+            f"padding: {values['padding']}px;"
+            f"border-radius: {values['corner_radius']}px;"
+            f"text-shadow: {stroke};"
+        )
+
+    def _connect_appearance_signals(self) -> None:
+        for combo in (self.font_family, self.font_weight, self.outline_mode, self.horizontal_align, self.vertical_align, self.completion_animation):
+            combo.currentTextChanged.connect(self.mark_dirty)
+        for spin in (self.font_size, self.outline_width, self.text_opacity, self.letter_spacing, self.background_opacity, self.padding, self.corner_radius):
+            spin.valueChanged.connect(self.mark_dirty)
+        for field in (self.text_color, self.outline_color, self.background_color):
+            field.textChanged.connect(self.mark_dirty)
+        for checkbox in (self.background_enabled, self.hide_when_inactive, self.continue_after_restart):
+            checkbox.toggled.connect(self.mark_dirty)
+
+    def _appearance_widgets(self) -> list[QWidget]:
+        return [
+            self.font_family, self.font_size, self.font_weight, self.text_color, self.outline_mode,
+            self.outline_color, self.outline_width, self.text_opacity, self.letter_spacing,
+            self.background_enabled, self.background_color, self.background_opacity, self.padding,
+            self.corner_radius, self.horizontal_align, self.vertical_align, self.completion_animation,
+            self.hide_when_inactive, self.continue_after_restart,
+        ]
 
     @staticmethod
     def _card() -> QFrame:

@@ -6,6 +6,20 @@
   font-display: swap;
 }
 
+:root {
+  --timer-font-family: "Segoe UI";
+  --timer-font-size: 96px;
+  --timer-font-weight: 700;
+  --timer-text-color: #ffffff;
+  --timer-text-opacity: 1;
+  --timer-letter-spacing: 0px;
+  --timer-outline-color: #000000;
+  --timer-outline-width: 3px;
+  --timer-background-color: transparent;
+  --timer-padding: 8px;
+  --timer-corner-radius: 8px;
+}
+
 html,
 body {
   width: 100%;
@@ -16,7 +30,7 @@ body {
 }
 
 body {
-  font-family: "Press Start 2P", Consolas, monospace;
+  font-family: var(--timer-font-family), Consolas, monospace;
 }
 
 #timer-root {
@@ -33,10 +47,16 @@ body {
   box-sizing: border-box;
   white-space: nowrap;
   line-height: 1.15;
-  color: #fff;
-  font-size: 96px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  color: var(--timer-text-color);
+  font-size: var(--timer-font-size);
+  font-weight: var(--timer-font-weight);
+  letter-spacing: var(--timer-letter-spacing);
+  opacity: var(--timer-text-opacity);
+  background: var(--timer-background-color);
+  padding: var(--timer-padding);
+  border-radius: var(--timer-corner-radius);
+  -webkit-text-stroke: var(--timer-outline-width) var(--timer-outline-color);
+  text-shadow: 0 0 calc(var(--timer-outline-width) + 1px) var(--timer-outline-color);
   text-align: center;
   transition: opacity 160ms ease, transform 160ms ease;
 }
