@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
 from .checkin import CheckInService
+from .resources import resource_path
 from .storage import TaskRepository
 from .timer.service import TimerService
 
@@ -21,10 +20,10 @@ DEFAULT_APPEARANCE = {
 
 
 def create_overlay_app(repository: TaskRepository) -> Flask:
-    app = Flask(__name__, template_folder="templates")
+    app = Flask(__name__, template_folder=str(resource_path("templates")))
     checkins = CheckInService(repository)
     timer = TimerService(repository)
-    overlay_dir = Path(__file__).with_name("overlay")
+    overlay_dir = resource_path("overlay")
 
     @app.after_request
     def no_cache_timer(response):
@@ -41,6 +40,10 @@ def create_overlay_app(repository: TaskRepository) -> Flask:
     @app.get("/api/overlay")
     def overlay_data():
         appearance = {**DEFAULT_APPEARANCE, **repository.get_setting("appearance", {})}
+        try:
+            appearance["cycle_seconds"] = max(8, int(appearance.get("cycle_seconds") or 8))
+        except (TypeError, ValueError):
+            appearance["cycle_seconds"] = DEFAULT_APPEARANCE["cycle_seconds"]
         participants = repository.task_snapshot(include_completed=appearance["show_completed"])
         if appearance["hide_empty"]:
             participants = [item for item in participants if item["tasks"]]
@@ -76,6 +79,6 @@ def create_overlay_app(repository: TaskRepository) -> Flask:
 
     @app.get("/timer/fonts/<path:filename>")
     def timer_font(filename: str):
-        return send_from_directory(Path(__file__).with_name("assets") / "fonts", filename)
+        return send_from_directory(resource_path("assets") / "fonts", filename)
 
     return app

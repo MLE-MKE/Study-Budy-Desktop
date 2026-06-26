@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .checkin import CheckInService, DEFAULT_CHECKIN_APPEARANCE
+from .checkin import COLOR_THEMES, CheckInService, DEFAULT_CHECKIN_APPEARANCE
 from .server import OverlayServer
 from .storage import TaskRepository
 from .theme import Theme
@@ -192,17 +192,16 @@ class CheckInView(QWidget):
 
     def _appearance_shapes_card(self) -> QFrame:
         card = self._card()
-        form = self._form(card, "Shapes")
-        for key, label, default in (
-            ("circle_color", "Circle color", "#8b5cf6"),
-            ("triangle_color", "Triangle color", "#22d3ee"),
-            ("square_color", "Square color", "#f97316"),
-            ("octagon_color", "Octagon color", "#facc15"),
-        ):
-            self._line(form, key, label, default)
+        form = self._form(card, "Octagon Shapes")
+        note = QLabel("All check-in avatars are octagons. Viewer colors are randomly chosen from the selected three-color theme.")
+        note.setWordWrap(True)
+        form.addRow("", note)
+        self._combo(form, "shape_color_theme", "Color theme", list(COLOR_THEMES.keys()))
         self._spin(form, "viewer_shape_size", "Shape size", 24, 160, " px")
+        self._spin(form, "shape_opacity", "Shape opacity", 0, 100, " %")
         self._spin(form, "outline_width", "Outline width", 0, 16, " px")
         self._line(form, "outline_color", "Outline color", "#1b0b45")
+        self._check(form, "always_show_shapes", "Always show checked-in shapes on screen")
         self._button_row(form, "Save Appearance", self.save_appearance)
         return card
 
@@ -315,7 +314,7 @@ class CheckInView(QWidget):
         card = self._card()
         form = self._form(card, "Animations")
         self._combo(form, "join_animation", "Entrance", ["Pop In", "Drop In", "Bounce In", "Fade and Scale"])
-        self._combo(form, "idle_animation", "Idle", ["Gentle Bounce", "Floating", "None"])
+        self._combo(form, "idle_animation", "Idle", ["None"])
         self._combo(form, "completion_animation", "Completion", ["Celebrate", "Jump", "Glow Pulse", "Spin Once"])
         self._combo(form, "leave_animation", "Leave", ["Portal Jump", "Fade Only"])
         self._spin(form, "animation_speed", "Animation speed", 25, 200, " %")
@@ -449,10 +448,10 @@ class CheckInView(QWidget):
     def _preview_html(self, active: list[dict]) -> str:
         if not active:
             active = [
-                {"display_name": "Killer_Queen55", "shape": "octagon", "color": "#facc15", "is_streamer": True},
-                {"display_name": "Alex", "shape": "circle", "color": "#8b5cf6", "is_streamer": False},
-                {"display_name": "Jamie", "shape": "triangle", "color": "#22d3ee", "is_streamer": False},
-                {"display_name": "FlowFox", "shape": "square", "color": "#f97316", "is_streamer": False},
+                {"display_name": "Killer_Queen55", "shape": "octagon", "color": "#8b5cf6", "is_streamer": True},
+                {"display_name": "Alex", "shape": "octagon", "color": "#1e3a8a", "is_streamer": False},
+                {"display_name": "Jamie", "shape": "octagon", "color": "#22d3ee", "is_streamer": False},
+                {"display_name": "FlowFox", "shape": "octagon", "color": "#8b5cf6", "is_streamer": False},
             ]
         glyphs = {"octagon": "⬣", "circle": "●", "triangle": "▲", "square": "■"}
         html = "<style>.stage{min-height:330px;border:1px solid #303743;border-radius:10px;background:#10151c;padding:22px}.row{display:flex;gap:34px;flex-wrap:wrap;justify-content:center}.a{text-align:center;margin:8px;min-width:120px}.name{max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bubble{display:inline-block;border:1px solid #888;border-radius:7px;padding:4px 8px;margin-bottom:8px}.shape{font-size:76px;line-height:80px;text-shadow:0 0 6px #000}.crown{color:#facc15;font-size:22px}</style><div class='stage'><div class='row'>"

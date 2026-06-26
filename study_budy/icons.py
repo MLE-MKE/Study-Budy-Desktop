@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from PySide6.QtGui import QIcon
 
-ASSETS_DIR = Path(__file__).with_name("assets")
+from .resources import resource_path
+
+ASSETS_DIR = resource_path("assets")
 LOGO_PATH = ASSETS_DIR / "study-budy-logo.png"
 ICON_DIR = ASSETS_DIR / "icons"
 

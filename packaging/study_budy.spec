@@ -1,0 +1,65 @@
+# -*- mode: python ; coding: utf-8 -*-
+"""PyInstaller onedir build for Study Budy Desktop."""
+
+from pathlib import Path
+
+ROOT = Path.cwd()
+PACKAGE = ROOT / "study_budy"
+APP_NAME = "Study Budy"
+
+datas = [
+    (str(PACKAGE / "assets"), "study_budy/assets"),
+    (str(PACKAGE / "overlay"), "study_budy/overlay"),
+    (str(PACKAGE / "templates"), "study_budy/templates"),
+]
+
+hiddenimports = [
+    "keyring.backends.Windows",
+    "keyring.backends.fail",
+    "keyring.backends.null",
+]
+
+a = Analysis(
+    [str(ROOT / "packaging" / "pyinstaller_entry.py")],
+    pathex=[str(ROOT)],
+    binaries=[],
+    datas=datas,
+    hiddenimports=hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+    optimize=0,
+)
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name=APP_NAME,
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=str(PACKAGE / "assets" / "study-budy-icon.ico"),
+    version=str(ROOT / "packaging" / "version_info.txt"),
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name=APP_NAME,
+)

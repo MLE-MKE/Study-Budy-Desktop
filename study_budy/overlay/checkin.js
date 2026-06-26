@@ -11,23 +11,44 @@ function safeText(value) {
 function slots(count, padding) {
   const width = window.innerWidth || 1280;
   const height = window.innerHeight || 720;
-  const cols = Math.max(3, Math.floor((width - padding * 2) / 160));
+  const lowerStart = Math.max(padding + 120, height * 0.68);
+  const lowerHeight = Math.max(110, height - lowerStart - padding);
+  const lanes = Math.max(1, Math.min(3, Math.floor(lowerHeight / 100)));
+  const columns = Math.max(1, Math.ceil(count / lanes));
+  const gap = (width - padding * 2) / (columns + 1);
+  const travel = Math.max(70, Math.min(180, gap * 0.42));
   return Array.from({ length: count }, (_, index) => {
-    if (index === 0) return { x: padding + 90, y: padding + 110 };
-    const viewerIndex = index - 1;
+    const lane = index % lanes;
+    const column = Math.floor(index / lanes);
+    const laneHeight = lowerHeight / lanes;
     return {
-      x: padding + 110 + (viewerIndex % cols) * 150,
-      y: padding + 250 + Math.floor(viewerIndex / cols) * 140,
+      x: padding + gap * (column + 1),
+      y: lowerStart + laneHeight * (lane + 0.5),
+      travel,
+      duration: 7 + (index % 4) * 1.2,
+      delay: -(index % 5) * 0.8,
     };
-  }).map(point => ({ x: Math.min(point.x, width - padding), y: Math.min(point.y, height - padding) }));
+  }).map(point => ({
+    ...point,
+    x: Math.min(Math.max(point.x, padding + point.travel), width - padding - point.travel),
+    y: Math.min(point.y, height - padding),
+  }));
 }
 
 function avatarElement(viewer, position, appearance) {
   const avatar = document.createElement("div");
   avatar.className = "checkin-avatar";
   avatar.dataset.userId = viewer.user_id;
+  updateAvatarElement(avatar, viewer, position, appearance);
+  return avatar;
+}
+
+function updateAvatarElement(avatar, viewer, position, appearance) {
   avatar.style.left = `${position.x}px`;
   avatar.style.top = `${position.y}px`;
+  avatar.style.setProperty("--idle-travel", `${position.travel || 90}px`);
+  avatar.style.setProperty("--idle-duration", `${position.duration || 8}s`);
+  avatar.style.setProperty("--idle-delay", `${position.delay || 0}s`);
   avatar.style.setProperty("--shape-size", `${viewer.is_streamer ? appearance.streamer_shape_size : appearance.viewer_shape_size}px`);
   avatar.style.setProperty("--shape-color", viewer.color);
   avatar.style.setProperty("--outline-color", appearance.outline_color);
@@ -36,26 +57,45 @@ function avatarElement(viewer, position, appearance) {
   avatar.style.setProperty("--name-size", `${appearance.name_size}px`);
   avatar.style.setProperty("--name-color", appearance.name_color);
 
+  const oldName = avatar.querySelector(".name");
+  if (oldName) oldName.remove();
   if (appearance.show_names) {
     const name = document.createElement("div");
     name.className = "name";
     name.append(safeText(viewer.display_name));
-    avatar.append(name);
+    avatar.prepend(name);
   }
 
+  const oldShape = avatar.querySelector(".shape");
+  if (oldShape) oldShape.remove();
   const shape = document.createElement("div");
   shape.className = `shape ${viewer.shape}`;
   avatar.append(shape);
-  return avatar;
 }
 
 function render(data) {
   const active = data.active || [];
   const appearance = data.appearance || {};
   const points = slots(active.length, appearance.overlay_padding || 48);
-  shapeLayer.replaceChildren();
+  const activeIds = new Set(active.map(viewer => String(viewer.user_id)));
+  known.forEach((avatar, userId) => {
+    if (!activeIds.has(userId)) {
+      avatar.remove();
+      known.delete(userId);
+    }
+  });
   active.forEach((viewer, index) => {
-    shapeLayer.append(avatarElement(viewer, points[index], appearance));
+    const userId = String(viewer.user_id);
+    let avatar = known.get(userId);
+    if (avatar) {
+      updateAvatarElement(avatar, viewer, points[index], appearance);
+    } else {
+      avatar = avatarElement(viewer, points[index], appearance);
+      avatar.classList.add("entering");
+      known.set(userId, avatar);
+      setTimeout(() => avatar.classList.remove("entering"), 520);
+    }
+    shapeLayer.append(avatar);
   });
   applyEvents(data.events || []);
 }
@@ -111,6 +151,7 @@ async function refresh() {
     render(await response.json());
   } catch {
     shapeLayer.replaceChildren();
+    known.clear();
   }
 }
 

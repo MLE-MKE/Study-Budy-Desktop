@@ -25,7 +25,11 @@ html, body {
   width: var(--shape-size, 72px);
   height: calc(var(--shape-size, 72px) + 34px);
   transform: translate(-50%, -50%);
-  animation: pop-in .45s ease-out both, gentle-bounce 3.2s ease-in-out .5s infinite;
+  animation: lower-screen-drift var(--idle-duration, 8s) ease-in-out var(--idle-delay, 0s) infinite alternate;
+}
+
+.checkin-avatar.entering {
+  animation: pop-in .45s ease-out both;
 }
 
 .name {
@@ -118,9 +122,10 @@ html, body {
   from { opacity: 0; transform: translate(-50%, -50%) scale(.3); }
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
-@keyframes gentle-bounce {
-  0%, 100% { margin-top: 0; }
-  50% { margin-top: -8px; }
+@keyframes lower-screen-drift {
+  0% { margin-left: calc(var(--idle-travel, 90px) * -1); margin-top: 0; }
+  50% { margin-top: -6px; }
+  100% { margin-left: var(--idle-travel, 90px); margin-top: 0; }
 }
 @keyframes bubble {
   0%, 100% { opacity: 0; transform: translate(-50%, 8px); }

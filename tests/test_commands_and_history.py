@@ -45,6 +45,27 @@ def test_required_twitch_command_aliases_route_to_existing_services(tmp_path):
     assert "Only the broadcaster" in service.handle("42", "Alex", "!ttimer start 00:30")
 
 
+def test_addtask_can_add_multiple_tasks_with_pipe_separator(tmp_path):
+    repo = repository(tmp_path)
+    service = ChatCommandService(repo)
+    response = service.handle("42", "Alex", "!addtask go ouside | take a nap | eat some food| jump")
+
+    assert response == "Added 4 tasks as 1-4: go ouside | take a nap | eat some food | jump"
+    participant = repo.list_participants()[0]
+    tasks = repo.list_tasks(participant["id"])
+    assert [task["text"] for task in tasks] == ["go ouside", "take a nap", "eat some food", "jump"]
+
+
+def test_addtask_pipe_separator_ignores_empty_parts(tmp_path):
+    repo = repository(tmp_path)
+    service = ChatCommandService(repo)
+    response = service.handle("42", "Alex", "!addtask Laundry || Stretch |   | Read")
+
+    assert response == "Added 3 tasks as 1-3: Laundry | Stretch | Read"
+    participant = repo.list_participants()[0]
+    assert [task["text"] for task in repo.list_tasks(participant["id"])] == ["Laundry", "Stretch", "Read"]
+
+
 def test_old_conflicting_aliases_are_disabled(tmp_path):
     repo = repository(tmp_path)
     service = ChatCommandService(repo)

@@ -48,8 +48,12 @@
 <main id="overlay" aria-live="polite"></main>
 <script>
 let index = 0;
+let lastCycleAt = 0;
+let lastCycleMode = '';
+let lastCycleCount = 0;
 const root = document.getElementById('overlay');
 const safeText = value => document.createTextNode(String(value || ''));
+const cycleDelay = settings => Math.max(8, Number(settings.cycle_seconds || 8)) * 1000;
 const titleIcon = name => ({book: '▰', box: '▣', star: '☆', heart: '♡'}[name] || '▰');
 
 function titleCard(settings) {
@@ -78,6 +82,20 @@ function card(participant) {
   return article;
 }
 
+function cycledParticipant(participants, settings, mode) {
+  const now = Date.now();
+  if (lastCycleMode !== mode || lastCycleCount !== participants.length) {
+    index = 0;
+    lastCycleAt = now;
+    lastCycleMode = mode;
+    lastCycleCount = participants.length;
+  } else if (now - lastCycleAt >= cycleDelay(settings)) {
+    index += 1;
+    lastCycleAt = now;
+  }
+  return participants[index % participants.length];
+}
+
 function draw(data) {
   const settings = data.appearance;
   root.style.cssText = `--padding:${settings.padding}px;--border:${settings.border_color};--radius:${settings.border_radius}px;--card:${settings.card_color}${Math.round(settings.card_opacity * 2.55).toString(16).padStart(2, '0')};--name-size:${settings.participant_font_size}px;--task-size:${settings.task_font_size}px;--done:${settings.completed_text_color};font-family:${settings.font_family},sans-serif;color:${settings.text_color};`;
@@ -92,9 +110,12 @@ function draw(data) {
     return;
   }
   if (settings.layout_mode === 'streamer_top') {
-    participants.forEach(participant => root.append(card(participant)));
+    const streamer = participants.find(participant => participant.participant_type === 'streamer');
+    const viewers = participants.filter(participant => participant !== streamer);
+    if (streamer) root.append(card(streamer));
+    if (viewers.length) root.append(card(cycledParticipant(viewers, settings, 'streamer_top')));
   } else {
-    root.append(card(participants[index++ % participants.length]));
+    root.append(card(cycledParticipant(participants, settings, 'cycle')));
   }
 }
 
@@ -106,7 +127,7 @@ async function refresh() {
   }
 }
 refresh();
-setInterval(refresh, 3000);
+setInterval(refresh, 1000);
 </script>
 </body>
 </html>

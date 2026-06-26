@@ -9,6 +9,7 @@ streamer accounts can be selected by role.
 from __future__ import annotations
 
 import logging
+import re
 import socket
 import ssl
 import threading
@@ -26,6 +27,11 @@ LOG = logging.getLogger(__name__)
 IRC_HOST = "irc.chat.twitch.tv"
 IRC_PORT = 6697
 SEND_CHAT_MESSAGE_ENDPOINT = "https://api.twitch.tv/helix/chat/messages"
+IRC_AUTH_FAILED_MESSAGES = (
+    "login authentication failed",
+    "improperly formatted auth",
+    "invalid nick",
+)
 
 
 @dataclass(frozen=True)
@@ -193,7 +199,20 @@ class TwitchIRCChatListener:
         if line.startswith("PING"):
             self._send("PONG :tmi.twitch.tv")
             return
-        if " JOIN #" in line and self.login in line.casefold():
+        lower = line.casefold()
+        if " NOTICE " in line and any(message in lower for message in IRC_AUTH_FAILED_MESSAGES):
+            raise TwitchTransportError("Twitch rejected the chat login. Reconnect the streamer account and make sure chat permissions are approved.")
+        if " 001 " in line or " 376 " in line or re.search(rf"\s(353|366)\s+{re.escape(self.login)}\s+", lower):
+            self._ready.set()
+            self.on_status(f"Listening in {self.channel}")
+            LOG.info("Twitch IRC listener joined monitored channel")
+            return
+        if " USERSTATE #" in line and f"#{self.channel}" in lower:
+            self._ready.set()
+            self.on_status(f"Listening in {self.channel}")
+            LOG.info("Twitch IRC listener confirmed user state in monitored channel")
+            return
+        if " JOIN #" in line and self.login in lower:
             self._ready.set()
             self.on_status(f"Listening in {self.channel}")
             LOG.info("Twitch IRC listener joined monitored channel")

@@ -4,7 +4,7 @@ from study_budy.storage import TaskRepository
 from study_budy.twitch.chat import BOT_METADATA_KEY, STREAMER_METADATA_KEY, TwitchChatCoordinator
 from study_budy.twitch.credentials import BOT_CREDENTIAL_KEY, MemoryTokenCredentialStore
 from study_budy.twitch.models import REQUIRED_CHAT_SCOPES, TokenSet
-from study_budy.twitch.transport import NormalizedChatMessage, TwitchHelixChatSender, parse_privmsg
+from study_budy.twitch.transport import NormalizedChatMessage, TwitchHelixChatSender, TwitchIRCChatListener, TwitchTransportError, parse_privmsg
 
 
 class FakeResponse:
@@ -57,6 +57,37 @@ def test_irc_privmsg_parses_identity_badges_and_text():
     assert message.text == "!addtask Live test"
     assert message.is_broadcaster
     assert message.is_moderator
+
+
+def test_irc_numeric_join_confirmation_marks_listener_ready():
+    statuses = []
+    listener = TwitchIRCChatListener(
+        channel="killer_queen55",
+        login="study_budy_bot",
+        access_token="token",
+        on_message=lambda message: None,
+        on_status=statuses.append,
+        socket_factory=lambda: None,
+    )
+    listener._handle_line(":study_budy_bot.tmi.twitch.tv 366 study_budy_bot #killer_queen55 :End of /NAMES list")
+    assert listener.is_ready()
+    assert statuses[-1] == "Listening in killer_queen55"
+
+
+def test_irc_auth_failure_notice_is_plain_language():
+    listener = TwitchIRCChatListener(
+        channel="killer_queen55",
+        login="study_budy_bot",
+        access_token="token",
+        on_message=lambda message: None,
+        socket_factory=lambda: None,
+    )
+    try:
+        listener._handle_line(":tmi.twitch.tv NOTICE * :Login authentication failed")
+    except TwitchTransportError as exc:
+        assert "Reconnect the streamer account" in str(exc)
+    else:
+        raise AssertionError("Expected TwitchTransportError")
 
 
 def test_live_message_reaches_existing_command_dispatcher(tmp_path):

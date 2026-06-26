@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-REQUIRED_CHAT_SCOPES = ("user:read:chat", "user:write:chat")
+REQUIRED_CHAT_SCOPES = ("chat:read", "chat:edit", "user:read:chat", "user:write:chat")
 
 
 @dataclass(frozen=True)

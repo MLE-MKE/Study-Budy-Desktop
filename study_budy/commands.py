@@ -10,7 +10,7 @@ from .storage import TaskRepository, ValidationError
 from .timer.commands import TimerCommandService
 
 COMMANDS = {
-    "addtask": "!addtask <description> - add a task",
+    "addtask": "!addtask <description> - add one or more tasks. Separate multiple tasks with |",
     "tasklist": "!tasklist - show your current tasks",
     "done": "!done <task number> - complete one task",
     "clear": "!clear <task number> - clear one task",
@@ -22,7 +22,7 @@ COMMANDS = {
     "help": "!help - show commands",
 }
 HELP_TEXT = (
-    "Tasks: !addtask <task>, !tasklist, !done #, !clear #, !clearall | "
+    "Tasks: !addtask <task> or !addtask one | two, !tasklist, !done #, !clear #, !clearall | "
     "Check-In: !checkin, !checkout, !dance | "
     "Timer for streamer/mods: !ttimer start <time>, pause, add <time>, clear"
 )
@@ -64,14 +64,23 @@ class ChatCommandService:
         if command == "addtask":
             if not argument:
                 return "Please include a task. Example: !addtask Finish laundry"
+            task_texts = [part.strip() for part in argument.split("|") if part.strip()]
+            if not task_texts:
+                return "Please include a task. Example: !addtask Finish laundry"
             try:
-                task = self.repository.add_task(display_name, argument, twitch_user_id=user_id)
+                added_tasks = [
+                    self.repository.add_task(display_name, text, twitch_user_id=user_id)
+                    for text in task_texts
+                ]
             except ValidationError as exc:
                 return str(exc)
             self.checkins.emit_event("task_added", user_id, display_name, {})
             updated_tasks = self.repository.list_tasks(participant["id"])
-            number = next((index + 1 for index, item in enumerate(updated_tasks) if item["id"] == task["id"]), len(updated_tasks))
-            return f"Added task {number}: {task['text']}"
+            first_number = next((index + 1 for index, item in enumerate(updated_tasks) if item["id"] == added_tasks[0]["id"]), len(updated_tasks))
+            if len(added_tasks) == 1:
+                return f"Added task {first_number}: {added_tasks[0]['text']}"
+            last_number = first_number + len(added_tasks) - 1
+            return f"Added {len(added_tasks)} tasks as {first_number}-{last_number}: " + " | ".join(task["text"] for task in added_tasks)
 
         if command == "tasklist":
             if not tasks:

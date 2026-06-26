@@ -6,6 +6,8 @@ venv/
 build/
 dist/
 *.spec
+!packaging/*.spec
+release/
 .env
 *.env
 !*.env.example

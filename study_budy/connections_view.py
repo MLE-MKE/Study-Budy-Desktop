@@ -58,28 +58,52 @@ AUTH_EXPIRED = "Expired"
 AUTH_CANCELLED = "Cancelled"
 AUTH_FAILED = "Failed"
 CLIENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9]{20,80}$")
-CLIENT_ID_HELP_TEXT = """How to Find Your Twitch Client ID
+CLIENT_ID_HELP_TEXT = """Twitch Client ID Setup
 
-1. Sign into the Twitch account that will own the Study Budy developer application.
-2. Open the Twitch Developer Console.
-3. Enable two-factor authentication on that Twitch account if Twitch requires it.
-4. Open the Applications section.
-5. Choose Register Your Application.
-6. Enter an application name such as Study Budy Desktop.
-7. Enter the OAuth redirect URL required by the Twitch registration form.
-8. Select the most appropriate application category.
-9. Create the application.
-10. Open Manage for the new application.
-11. Copy the value labeled Client ID.
-12. Return to Study Budy.
-13. Paste it into the Twitch Client ID field.
-14. Click Save Client ID.
+Most users only need to do this once.
 
-The Client ID identifies the Study Budy application. It does not connect a Twitch account by itself.
+What is a Client ID?
 
-Do not paste your Twitch password, access token, refresh token, or Client Secret into this field.
+A Client ID is the public app ID Twitch gives to Study Budy. It is not your Twitch username, password, token, or Client Secret.
 
-The same Client ID is used to authorize both your streamer account and your optional bot account.
+Create one in Twitch
+
+1. Open the Twitch Developer Console:
+   https://dev.twitch.tv/console/apps
+2. Sign in with the Twitch account you want to use to manage the app.
+3. If Twitch asks for two-factor authentication, turn it on for that Twitch account.
+4. Click Register Your Application.
+5. Name it something simple, such as:
+   Study Budy Desktop
+6. Twitch will ask for an OAuth Redirect URL.
+   You do not need to find one in Study Budy. Study Budy uses a code-based Twitch login flow, but Twitch still requires this box when creating an app.
+   In the OAuth Redirect URL box, enter:
+   http://localhost
+7. If Twitch asks for more than one redirect URL, only one is needed for Study Budy.
+8. For Category, choose Application Integration.
+   If Twitch changes the category list and Application Integration is not shown, choose Chat Bot, Tool, or Other as the closest match.
+9. If Twitch asks for Client Type, choose Public.
+   Do not choose Confidential for Study Budy Desktop. Public is correct because Study Budy runs on your computer and does not need a Client Secret.
+10. Click Create.
+11. Open Manage for the app you just created.
+12. Copy the value named Client ID.
+
+Add it to Study Budy
+
+1. Return to Study Budy.
+2. Paste only the Client ID into the Twitch Client ID box.
+3. Click Save Client ID.
+4. Then connect your Streamer Account.
+5. Optional: connect your Bot Account if you want chat replies to come from a separate bot username.
+
+Important safety notes
+
+- Do not paste your Twitch password.
+- Do not paste a Client Secret.
+- Do not paste an access token or refresh token.
+- The same Client ID can be used for both the streamer account and bot account.
+
+If chat stays stuck on Connecting after changing scopes, disconnect and reconnect the streamer account so Twitch can grant the new chat permissions.
 """
 
 
@@ -144,6 +168,7 @@ class ConnectionsView(QWidget):
         self.current_device: DeviceCode | None = None
         self.code_started_at: datetime | None = None
         self.auth_context: AuthorizationContext | None = None
+        self.client_id_dirty = False
 
         page = QVBoxLayout(self)
         page.setContentsMargins(0, 0, 0, 0)
@@ -180,6 +205,7 @@ class ConnectionsView(QWidget):
         self.client_id_help.clicked.connect(self.show_client_id_help)
         self.client_id = QLineEdit(self.repository.get_setting("twitch_client_id", ""))
         self.client_id.setPlaceholderText("Twitch Client ID")
+        self.client_id.textEdited.connect(self.on_client_id_edited)
         self.save_client_id = QPushButton("Save Client ID")
         self.save_client_id.clicked.connect(self.save_client_id_setting)
         client_box.addWidget(QLabel("Twitch Client ID"), 0, 0)
@@ -391,6 +417,16 @@ class ConnectionsView(QWidget):
             box.addWidget(button)
         self.root.addWidget(card)
 
+    def on_client_id_edited(self, _text: str) -> None:
+        self.client_id_dirty = True
+        saved = self.repository.get_setting("twitch_client_id", "").strip()
+        current = self.client_id.text().strip()
+        if current and current != saved:
+            self.client_id_status.setText("Unsaved Changes")
+            self.client_id_status.setObjectName("StatusBad")
+            self.client_id_status.style().unpolish(self.client_id_status)
+            self.client_id_status.style().polish(self.client_id_status)
+
     def save_client_id_setting(self) -> None:
         client_id = self.client_id.text().strip()
         if not client_id:
@@ -407,13 +443,18 @@ class ConnectionsView(QWidget):
             self.flow_result.setText("Twitch Client ID could not be saved. Check the application log for details.")
             LOG.error("Twitch Client ID failed storage round trip.")
             return
+        self.client_id_dirty = False
+        self.client_id.setText(saved)
         self.flow_result.setText("Twitch Client ID saved.")
         self.update_client_id_status()
 
     def update_client_id_status(self) -> None:
-        configured = bool(self.repository.get_setting("twitch_client_id", "").strip())
-        self.client_id_status.setText("Configured" if configured else "Not Configured")
-        self.client_id_status.setObjectName("StatusGood" if configured else "StatusBad")
+        saved = self.repository.get_setting("twitch_client_id", "").strip()
+        current = self.client_id.text().strip()
+        unsaved = self.client_id_dirty and current != saved
+        configured = bool(saved)
+        self.client_id_status.setText("Unsaved Changes" if unsaved else ("Configured" if configured else "Not Configured"))
+        self.client_id_status.setObjectName("StatusBad" if unsaved or not configured else "StatusGood")
         self.client_id_status.style().unpolish(self.client_id_status)
         self.client_id_status.style().polish(self.client_id_status)
 
@@ -692,7 +733,9 @@ class ConnectionsView(QWidget):
     def refresh(self) -> None:
         streamer = self.repository.get_setting(STREAMER_METADATA_KEY, None)
         bot = self.repository.get_setting(BOT_METADATA_KEY, None)
-        self.client_id.setText(self.repository.get_setting("twitch_client_id", ""))
+        saved_client_id = self.repository.get_setting("twitch_client_id", "")
+        if not self.client_id_dirty:
+            self.client_id.setText(saved_client_id)
         self.update_client_id_status()
         self.monitored_channel.setText(self.chat.monitored_channel())
         self.response_mode.setCurrentText(self.chat.response_mode())

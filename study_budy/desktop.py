@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from . import __version__
 from .appearance_panel import AppearancePanel
 from .checkin import CheckInService
 from .checkin_view import CheckInView
@@ -205,6 +206,7 @@ class StudyBudyWindow(QMainWindow):
             <p>Add a Browser Source, paste the same Study Budy overlay URL, set the recommended dimensions, and position it in your scene.</p>
             <h2>Twitch commands</h2>
             <p><b>Tasks:</b> <code>!addtask Finish laundry</code>, <code>!tasklist</code>, <code>!done 2</code>, <code>!clear 2</code>, <code>!clearall</code></p>
+            <p>To add several tasks at once, separate them with a vertical bar: <code>!addtask go outside | take a nap | eat some food | jump</code></p>
             <p><b>Check-In:</b> <code>!checkin</code>, <code>!checkout</code>, <code>!dance</code></p>
             <p><b>Timer for streamer/mods:</b> <code>!ttimer start 30:00</code>, <code>!ttimer pause</code>, <code>!ttimer add 05:00</code>, <code>!ttimer clear</code></p>
             <h2>Privacy</h2>
@@ -332,7 +334,7 @@ class StudyBudyWindow(QMainWindow):
         box.setWindowTitle("About Study Budy")
         box.setIconPixmap(QPixmap(str(LOGO_PATH)).scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         box.setText("Study Budy Desktop")
-        box.setInformativeText("Version 1.2.0\nStreamer task control and OBS Browser Source overlay.")
+        box.setInformativeText(f"Version {__version__}\nStreamer task control and OBS Browser Source overlay.")
         box.exec()
 
     def closeEvent(self, event) -> None:

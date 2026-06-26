@@ -9,14 +9,16 @@ from typing import Any
 
 from .storage import TaskRepository, now
 
-VIEWER_SHAPES = ("circle", "triangle", "square")
+VIEWER_SHAPES = ("octagon",)
 STREAMER_SHAPE = "octagon"
-DEFAULT_COLORS = {
-    "circle": "#8b5cf6",
-    "triangle": "#22d3ee",
-    "square": "#f97316",
-    "octagon": "#facc15",
+COLOR_THEMES = {
+    "Fireworks": ("#ef4444", "#ffffff", "#2563eb"),
+    "Moon Rocks": ("#d1d5db", "#4b5563", "#000000"),
+    "Cosmic Study": ("#8b5cf6", "#1e3a8a", "#22d3ee"),
+    "Cotton Candy": ("#f9a8d4", "#c4b5fd", "#bfdbfe"),
+    "Forest Splash": ("#14532d", "#86efac", "#2563eb"),
 }
+DEFAULT_COLORS = {"octagon": COLOR_THEMES["Cosmic Study"][0]}
 
 
 DEFAULT_CHECKIN_APPEARANCE = {
@@ -32,6 +34,8 @@ DEFAULT_CHECKIN_APPEARANCE = {
     "outline_color": "#1b0b45",
     "outline_width": 4,
     "shape_opacity": 96,
+    "shape_color_theme": "Cosmic Study",
+    "always_show_shapes": True,
     "show_names": True,
     "name_font": "Comic Sans MS",
     "name_size": 16,
@@ -96,8 +100,8 @@ class CheckInService:
         initialize_checkin(self.repository)
 
     def checkin(self, user_id: str, display_name: str, is_streamer: bool = False) -> dict[str, Any]:
-        shape = STREAMER_SHAPE if is_streamer else self.preferred_shape(user_id) or random.choice(VIEWER_SHAPES)
-        color = DEFAULT_COLORS[shape]
+        shape = STREAMER_SHAPE
+        color = self.random_theme_color()
         timestamp = now()
         with self.repository.connection() as conn:
             existing = conn.execute("SELECT * FROM checkin_users WHERE user_id=?", (user_id,)).fetchone()
@@ -160,11 +164,10 @@ class CheckInService:
 
     def set_shape(self, user_id: str, display_name: str, shape: str) -> dict[str, Any]:
         clean = shape.casefold().strip()
-        if clean == STREAMER_SHAPE:
-            raise ValueError("The octagon is reserved for the streamer.")
-        if clean not in VIEWER_SHAPES:
-            raise ValueError("Choose circle, triangle, or square.")
+        if clean != STREAMER_SHAPE:
+            raise ValueError("Study Budy Check-In uses octagons only.")
         timestamp = now()
+        color = self.random_theme_color()
         with self.repository.connection() as conn:
             conn.execute(
                 """
@@ -179,16 +182,16 @@ class CheckInService:
                     assigned_color=CASE WHEN checkin_users.is_streamer=1 THEN checkin_users.assigned_color ELSE excluded.assigned_color END,
                     updated_at=excluded.updated_at
                 """,
-                (user_id, display_name, clean, DEFAULT_COLORS[clean], clean, DEFAULT_COLORS[clean], timestamp),
+                (user_id, display_name, clean, color, STREAMER_SHAPE, color, timestamp),
             )
             row = conn.execute("SELECT * FROM checkin_users WHERE user_id=?", (user_id,)).fetchone()
-        self.emit_event("shape_changed", user_id, display_name, {"shape": clean})
+        self.emit_event("shape_changed", user_id, display_name, {"shape": STREAMER_SHAPE})
         return self._row(row)
 
     def preferred_shape(self, user_id: str) -> str | None:
         with self.repository.connection() as conn:
             row = conn.execute("SELECT preferred_shape FROM checkin_users WHERE user_id=?", (user_id,)).fetchone()
-        return row["preferred_shape"] if row and row["preferred_shape"] in VIEWER_SHAPES else None
+        return STREAMER_SHAPE if row else None
 
     def active_checkins(self) -> list[dict[str, Any]]:
         with self.repository.connection() as conn:
@@ -242,10 +245,15 @@ class CheckInService:
     def snapshot(self) -> dict[str, Any]:
         appearance = {**DEFAULT_CHECKIN_APPEARANCE, **self.repository.get_setting("checkin_appearance", {})}
         return {
-            "active": self.active_checkins(),
+            "active": self.active_checkins() if appearance.get("always_show_shapes", True) else [],
             "appearance": appearance,
             "events": self.events_since(0)[-25:],
         }
+
+    def random_theme_color(self) -> str:
+        appearance = {**DEFAULT_CHECKIN_APPEARANCE, **self.repository.get_setting("checkin_appearance", {})}
+        theme = str(appearance.get("shape_color_theme") or "Cosmic Study")
+        return random.choice(COLOR_THEMES.get(theme, COLOR_THEMES["Cosmic Study"]))
 
     @staticmethod
     def _row(row) -> dict[str, Any]:

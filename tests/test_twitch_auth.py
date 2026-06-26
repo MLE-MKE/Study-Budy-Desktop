@@ -96,7 +96,7 @@ def test_device_code_request_success():
     code = TwitchDeviceAuthClient("client-id", session=session).request_device_code(REQUIRED_CHAT_SCOPES)
     assert code.user_code == "ABCD-EFGH"
     assert session.post_calls[0]["data"]["client_id"] == "client-id"
-    assert session.post_calls[0]["data"]["scopes"] == "user:read:chat user:write:chat"
+    assert session.post_calls[0]["data"]["scopes"] == "chat:read chat:edit user:read:chat user:write:chat"
 
 
 def test_device_code_request_failure():
@@ -154,7 +154,7 @@ def test_token_validation_user_lookup_and_missing_scopes():
     user = api.fetch_user("access-token")
     assert validation.user_id == "123"
     assert user.display_name == "Killer_Queen55"
-    assert missing_required_scopes(("user:read:chat",)) == ("user:write:chat",)
+    assert missing_required_scopes(("user:read:chat",)) == ("chat:read", "chat:edit", "user:write:chat")
 
 
 def test_refresh_token_rotation():
@@ -189,7 +189,8 @@ def test_duplicate_connection_attempt_is_blocked(qapp, repository):
 
 def test_client_id_help_and_validation(qapp, repository, monkeypatch):
     view = ConnectionsView(repository, lambda: None)
-    assert "How to Find Your Twitch Client ID" in CLIENT_ID_HELP_TEXT
+    assert "Twitch Client ID Setup" in CLIENT_ID_HELP_TEXT
+    assert "http://localhost" in CLIENT_ID_HELP_TEXT
     assert "Do not paste your Twitch password" in CLIENT_ID_HELP_TEXT
     called = []
     monkeypatch.setattr("study_budy.connections_view.QDesktopServices.openUrl", lambda url: called.append(url.toString()) or True)
@@ -207,6 +208,22 @@ def test_client_id_help_and_validation(qapp, repository, monkeypatch):
     assert view.client_id_status.text() == "Configured"
     assert repository.get_setting("twitch_streamer_account", None) is None
     assert repository.get_setting("twitch_bot_account", None) is None
+
+
+def test_client_id_edit_is_not_overwritten_by_refresh(qapp, repository):
+    repository.set_setting("twitch_client_id", "a" * 30)
+    view = ConnectionsView(repository, lambda: None)
+
+    view.client_id.setText("b" * 30)
+    view.on_client_id_edited("b" * 30)
+    view.refresh()
+
+    assert view.client_id.text() == "b" * 30
+    assert view.client_id_status.text() == "Unsaved Changes"
+    view.save_client_id_setting()
+    assert repository.get_setting("twitch_client_id") == "b" * 30
+    view.refresh()
+    assert view.client_id.text() == "b" * 30
 
 
 def test_connect_buttons_are_wired_and_missing_client_id_is_visible(qapp, repository):

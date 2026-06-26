@@ -1,4 +1,8 @@
-from study_budy.checkin import CheckInService, STREAMER_SHAPE, VIEWER_SHAPES
+import re
+
+import pytest
+
+from study_budy.checkin import COLOR_THEMES, CheckInService, STREAMER_SHAPE, VIEWER_SHAPES
 from study_budy.commands import ChatCommandService
 from study_budy.overlay_service import create_overlay_app
 from study_budy.storage import TaskRepository
@@ -18,7 +22,8 @@ def test_checkin_adds_one_viewer_and_duplicates_do_not_duplicate(tmp_path):
     assert "checked in" in service.handle("42", "Alex", "!checkin")
     active = CheckInService(repo).active_checkins()
     assert len(active) == 1
-    assert active[0]["shape"] in VIEWER_SHAPES
+    assert VIEWER_SHAPES == ("octagon",)
+    assert active[0]["shape"] == "octagon"
 
 
 def test_streamer_shape_is_octagon_and_viewer_cannot_select_octagon(tmp_path):
@@ -30,15 +35,18 @@ def test_streamer_shape_is_octagon_and_viewer_cannot_select_octagon(tmp_path):
     assert service.handle("42", "Alex", "!shape octagon") is None
 
 
-def test_shape_preference_service_still_persists_for_desktop_controls(tmp_path):
+def test_shape_preference_service_keeps_checkins_octagon_only(tmp_path):
     repo = repository(tmp_path)
-    assert CheckInService(repo).set_shape("42", "Alex", "triangle")["shape"] == "triangle"
+    checkins = CheckInService(repo)
+    assert checkins.set_shape("42", "Alex", "octagon")["shape"] == "octagon"
+    with pytest.raises(ValueError, match="octagons only"):
+        checkins.set_shape("42", "Alex", "triangle")
     ChatCommandService(repo).handle("42", "Alex", "!checkin")
     active = CheckInService(repo).active_checkins()
-    assert active[0]["shape"] == "triangle"
+    assert active[0]["shape"] == "octagon"
     reloaded = TaskRepository(repo.path)
     reloaded.initialize()
-    assert CheckInService(reloaded).preferred_shape("42") == "triangle"
+    assert CheckInService(reloaded).preferred_shape("42") == "octagon"
 
 
 def test_leave_emits_portal_event(tmp_path):
@@ -99,6 +107,7 @@ def test_checkin_overlay_route_is_separate_and_escapes_with_text_nodes(tmp_path)
     assert "checkin_dance" in checkin_js
     payload = client.get("/api/checkin").get_json()
     assert payload["active"][0]["display_name"] == "<script>alert(1)</script>"
+    assert payload["active"][0]["shape"] == "octagon"
 
 
 def test_session_reset_clears_active_checkins_but_keeps_history(tmp_path):
@@ -112,8 +121,41 @@ def test_session_reset_clears_active_checkins_but_keeps_history(tmp_path):
 
 def test_checkin_settings_persist_and_api_exposes_no_secrets(tmp_path):
     repo = repository(tmp_path)
-    repo.set_setting("checkin_appearance", {"viewer_shape_size": 84})
+    repo.set_setting("checkin_appearance", {"viewer_shape_size": 84, "shape_opacity": 75, "shape_color_theme": "Fireworks"})
     payload = create_overlay_app(repo).test_client().get("/api/checkin").get_json()
     assert payload["appearance"]["viewer_shape_size"] == 84
+    assert payload["appearance"]["shape_opacity"] == 75
+    assert payload["appearance"]["shape_color_theme"] == "Fireworks"
     assert "token" not in str(payload).casefold()
     assert "password" not in str(payload).casefold()
+
+
+def test_color_theme_controls_random_octagon_colors_and_visibility(tmp_path):
+    repo = repository(tmp_path)
+    repo.set_setting("checkin_appearance", {"shape_color_theme": "Moon Rocks", "always_show_shapes": True})
+    checkins = CheckInService(repo)
+    active_colors = {checkins.checkin(str(index), f"Viewer{index}")["color"] for index in range(12)}
+    assert active_colors <= set(COLOR_THEMES["Moon Rocks"])
+    assert CheckInService(repo).snapshot()["active"]
+
+    repo.set_setting("checkin_appearance", {"shape_color_theme": "Moon Rocks", "always_show_shapes": False})
+    assert CheckInService(repo).snapshot()["active"] == []
+
+
+def test_checkin_overlay_enters_once_then_drifts_across_lower_screen(tmp_path):
+    repo = repository(tmp_path)
+    client = create_overlay_app(repo).test_client()
+    css = client.get("/checkin/checkin.css").get_data(as_text=True)
+    js = client.get("/checkin/checkin.js").get_data(as_text=True)
+    avatar_rule = re.search(r"\.checkin-avatar\s*\{(?P<body>.*?)\}", css, re.S)
+    entering_rule = re.search(r"\.checkin-avatar\.entering\s*\{(?P<body>.*?)\}", css, re.S)
+    assert avatar_rule is not None
+    assert entering_rule is not None
+    assert "lower-screen-drift" in avatar_rule.group("body")
+    assert "infinite" in avatar_rule.group("body")
+    assert "pop-in" in entering_rule.group("body")
+    assert "infinite" not in entering_rule.group("body")
+    assert "known.get" in js
+    assert "classList.add(\"entering\")" in js
+    assert "height * 0.68" in js
+    assert "--idle-travel" in js

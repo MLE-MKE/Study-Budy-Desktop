@@ -6,6 +6,7 @@ from PySide6.QtCore import QSize, Signal, Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
+from . import __version__
 from .icons import LOGO_PATH, icon
 from .theme import Theme
 
@@ -53,7 +54,7 @@ class Sidebar(QFrame):
             self.buttons.append(button)
 
         self.layout.addStretch(1)
-        self.version = QLabel("v1.2.0")
+        self.version = QLabel(f"v{__version__}")
         self.version.setObjectName("SmallNote")
         self.layout.addWidget(self.version)
         self.system_status = QLabel("●  All Systems Operational")

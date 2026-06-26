@@ -16,7 +16,7 @@ The repository is a small Python prototype, not yet a packaged desktop applicati
 
 ## Working features preserved as product behavior
 
-- Viewer task submission via `!addtask`.
+- Viewer task submission via `!addtask`, including multiple tasks separated with `|`.
 - Viewer task lists via `!tasklist`.
 - Numbered completion via `!done N`.
 - Numbered clearing via `!clear #` and full-list clearing via `!clearall`.
