@@ -34,12 +34,18 @@ Install dependencies:
 
 ```powershell
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt -r requirements-packaging.txt
+python -m pip install -r requirements.txt -r requirements-build.txt
 ```
 
 ## Build command
 
-From the repository root:
+For the easiest build, double-click:
+
+```text
+build_windows.bat
+```
+
+Or run this from the repository root:
 
 ```powershell
 .\packaging\build_windows.ps1 -Python .\.venv314\Scripts\python.exe
@@ -62,6 +68,12 @@ The script:
 6. Creates `release\Study-Budy-Desktop-v0.1.0-Windows-Portable.zip`.
 7. Builds `release\Study-Budy-Desktop-v0.1.0-Windows-Setup.exe` if Inno Setup is installed.
 8. Prints SHA-256 checksums.
+
+To create only the installer after the app is already packaged, double-click:
+
+```text
+create_installer.bat
+```
 
 ## PyInstaller resources
 

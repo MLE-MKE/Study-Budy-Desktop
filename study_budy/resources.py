@@ -6,6 +6,10 @@ import sys
 from pathlib import Path
 
 
+# ---- RESOURCE PATH HANDLING ----
+# This section keeps bundled read-only files working after PyInstaller moves
+# them into its packaged app folder. It also keeps normal source-code runs using
+# the regular study_budy package directory.
 def package_root() -> Path:
     """Return the directory containing bundled Study Budy runtime files."""
     if getattr(sys, "frozen", False):
@@ -15,6 +19,9 @@ def package_root() -> Path:
     return Path(__file__).resolve().parent
 
 
+# ---- RESOURCE FILE LOOKUP ----
+# This helper is the one place the rest of the app should use for bundled
+# images, icons, fonts, HTML, CSS, and JavaScript files.
 def resource_path(relative_path: str | Path) -> Path:
     """Resolve a runtime resource from the Study Budy package root."""
     return package_root() / Path(relative_path)

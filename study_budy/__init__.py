@@ -1,3 +1,4 @@
 """Study Budy desktop application package."""
 
-__version__ = "0.1.0"
+APP_VERSION = "0.1.0"
+__version__ = APP_VERSION

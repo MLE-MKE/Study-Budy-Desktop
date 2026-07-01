@@ -32,7 +32,7 @@ python -m study_budy.main
 The maintained Windows packaging flow creates an unsigned internal test build:
 
 ```powershell
-.\packaging\build_windows.ps1 -Python .\.venv314\Scripts\python.exe
+build_windows.bat
 ```
 
 Expected artifacts:
