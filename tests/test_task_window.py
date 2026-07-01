@@ -24,9 +24,11 @@ def test_task_window_action_buttons_are_not_clipped_and_completed_actions_are_be
 
     window = TaskWindow(repo)
 
-    assert window.clear_finished_button.text() == "Clear Finished Tasks"
+    assert window.clear_finished_button.text() == "Delete Finished Tasks"
     assert window.archive_completed_button.text() == "Archive Completed Tasks"
     assert window.remove_viewer_button.text() == "Remove Viewer From List"
+    assert not hasattr(window, "archive_button")
+    assert not hasattr(window, "archive_selected")
     assert window.clear_finished_button.minimumWidth() >= 220
     assert window.archive_completed_button.minimumWidth() >= 220
     assert window.remove_viewer_button.minimumWidth() >= 220
