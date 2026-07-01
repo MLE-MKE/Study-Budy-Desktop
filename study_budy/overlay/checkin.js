@@ -4,6 +4,14 @@ const portalLayer = document.getElementById("portal-layer");
 let known = new Map();
 let lastEventId = 0;
 
+async function sendHeartbeat() {
+  try {
+    await fetch("/api/overlay-clients/checkin/heartbeat", { method: "POST", cache: "no-store" });
+  } catch {
+    // OBS may briefly pause Browser Source networking while scenes change.
+  }
+}
+
 function safeText(value) {
   return document.createTextNode(String(value || ""));
 }
@@ -156,5 +164,7 @@ async function refresh() {
 }
 
 refresh();
+sendHeartbeat();
 setInterval(refresh, 1200);
+setInterval(sendHeartbeat, 2000);
 window.addEventListener("resize", refresh);

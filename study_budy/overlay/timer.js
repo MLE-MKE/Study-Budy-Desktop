@@ -5,6 +5,14 @@ let latest = null;
 let localReceivedAt = Date.now() / 1000;
 let lastAppearanceEventId = null;
 
+async function sendHeartbeat() {
+  try {
+    await fetch("/api/overlay-clients/timer/heartbeat", { method: "POST", cache: "no-store" });
+  } catch {
+    // OBS may briefly pause Browser Source networking while scenes change.
+  }
+}
+
 function formatDuration(seconds) {
   const safe = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(safe / 3600);
@@ -111,5 +119,7 @@ async function refresh() {
 }
 
 refresh();
+sendHeartbeat();
 setInterval(refresh, 1000);
 setInterval(render, 250);
+setInterval(sendHeartbeat, 2000);

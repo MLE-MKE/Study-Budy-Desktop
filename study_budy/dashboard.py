@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtWidgets import (
     QBoxLayout,
     QFrame,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from .appearance_panel import AppearancePanel
 from .icons import LOGO_PATH, icon
+from .overlay_clients import CHECKIN_OVERLAY_CLIENT, TIMER_OVERLAY_CLIENT, is_overlay_client_connected
 from .overlay_preview import OverlayPreview
 from .server import OverlayServer
 from .status_card import StatusCard
@@ -65,6 +66,10 @@ class DashboardView(QWidget):
         self._build_main()
         self._build_right()
         self.apply_responsive_layout(False, False, False)
+        self.status_refresh_timer = QTimer(self)
+        self.status_refresh_timer.setInterval(1500)
+        self.status_refresh_timer.timeout.connect(self.refresh_overlay_connection_status)
+        self.status_refresh_timer.start()
 
     def _build_main(self) -> None:
         self.header_grid = QGridLayout()
@@ -84,11 +89,13 @@ class DashboardView(QWidget):
         self.card_grid = QGridLayout()
         self.card_grid.setHorizontalSpacing(Theme.SECTION_SPACING)
         self.card_grid.setVerticalSpacing(Theme.SECTION_SPACING)
-        self.twitch_card = StatusCard("Twitch", "twitch")
-        self.obs_card = StatusCard("OBS", "obs")
+        # ---- OVERLAY CONNECTION STATUS BUTTONS ----
+        # These buttons show whether my Timer and beta Check-In overlays are connected.
+        self.timer_card = StatusCard("Timer Overlay", "timer")
+        self.checkin_card = StatusCard("Check-In Overlay", "check")
         self.overlay_card = StatusCard("Overlay Server", "server")
         self.session_card = StatusCard("Session Status", "session")
-        self.status_cards = [self.twitch_card, self.obs_card, self.overlay_card, self.session_card]
+        self.status_cards = [self.timer_card, self.checkin_card, self.overlay_card, self.session_card]
         self.main.addLayout(self.card_grid)
 
         url_card = self._card()
@@ -372,12 +379,29 @@ class DashboardView(QWidget):
         self.live_badge.style().unpolish(self.live_badge)
         self.live_badge.style().polish(self.live_badge)
         self.overlay_url.setText(self.overlay_server.url)
-        preview_mode = bool(self.repository.get_setting("development_bot", False))
-        self.twitch_card.set_status("Preview Mode" if preview_mode else "Not Connected", preview_mode)
-        self.obs_card.set_status("Not Connected", False)
-        self.overlay_card.set_status("Live" if is_live else "Offline", is_live)
-        self.session_card.set_status("Live" if is_live else "Offline", is_live)
+        self.refresh_overlay_connection_status()
         self.completed_number.setText(str(self.repository.lifetime_completed()))
         self.sessions_number.setText(str(self.repository.total_sessions()))
         self.preview.refresh()
         self.appearance.load()
+
+    def refresh_overlay_connection_status(self) -> None:
+        # ---- OVERLAY CONNECTION STATUS UPDATES ----
+        # This section keeps my overlay connection buttons synchronized with the real client connections.
+        server_live = self.overlay_server.running
+
+        # ---- TIMER OVERLAY CONNECTION STATUS ----
+        # This button shows whether my timer overlay is connected to the application.
+        timer_connected = server_live and is_overlay_client_connected(TIMER_OVERLAY_CLIENT)
+        self.timer_card.set_status("Timer Connected" if timer_connected else "Timer Disconnected", timer_connected)
+
+        # ---- CHECK-IN OVERLAY CONNECTION STATUS ----
+        # This button shows whether my beta check-in overlay is connected.
+        checkin_connected = server_live and is_overlay_client_connected(CHECKIN_OVERLAY_CLIENT)
+        self.checkin_card.set_status(
+            "Check-In Connected (Beta)" if checkin_connected else "Check-In Disconnected (Beta)",
+            checkin_connected,
+        )
+
+        self.overlay_card.set_status("Live" if server_live else "Offline", server_live)
+        self.session_card.set_status("Live" if server_live else "Offline", server_live)

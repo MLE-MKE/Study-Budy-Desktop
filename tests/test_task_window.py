@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QHBoxLayout
 
 from study_budy.storage import TaskRepository
 from study_budy.task_window import TaskWindow
@@ -24,7 +24,7 @@ def test_task_window_action_buttons_are_not_clipped_and_completed_actions_are_be
 
     window = TaskWindow(repo)
 
-    assert window.clear_finished_button.text() == "Delete Finished Tasks"
+    assert window.clear_finished_button.text() == "Delete Completed Tasks"
     assert window.archive_completed_button.text() == "Archive Completed Tasks"
     assert window.remove_viewer_button.text() == "Remove Viewer From List"
     assert not hasattr(window, "archive_button")
@@ -33,6 +33,7 @@ def test_task_window_action_buttons_are_not_clipped_and_completed_actions_are_be
     assert window.archive_completed_button.minimumWidth() >= 220
     assert window.remove_viewer_button.minimumWidth() >= 220
     bottom_actions = window.layout().itemAt(window.layout().count() - 1).layout()
+    assert isinstance(bottom_actions, QHBoxLayout)
     assert window.layout().indexOf(window.tree) < window.layout().count() - 1
     assert bottom_actions.itemAt(0).widget() is window.clear_finished_button
     assert bottom_actions.itemAt(1).widget() is window.archive_completed_button

@@ -79,19 +79,19 @@ class TaskWindow(QWidget):
         layout.addWidget(self.tree, 1)
 
         # ---- COMPLETED TASK ACTION BUTTONS ----
-        # This section puts my completed-task controls underneath the task list,
-        # where they are easier to understand after reviewing the visible tasks.
-        completed_actions = QVBoxLayout()
+        # These buttons let me delete or archive my completed tasks.
+        # peepeepoo poo, my completed-task buttons finally sit together.
+        completed_actions = QHBoxLayout()
         completed_actions.setSpacing(10)
         completed_actions.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # This button deletes my finished tasks from the list.
-        self.clear_finished_button = QPushButton("Delete Finished Tasks")
+        self.clear_finished_button = QPushButton("Delete Completed Tasks")
         self.clear_finished_button.clicked.connect(self.clear_finished)
         self.archive_completed_button = QPushButton("Archive Completed Tasks")
         self.archive_completed_button.clicked.connect(self.archive_completed)
         for button in (self.clear_finished_button, self.archive_completed_button):
             self._style_task_action_button(button)
-            completed_actions.addWidget(button, 0, Qt.AlignmentFlag.AlignCenter)
+            completed_actions.addWidget(button, 1, Qt.AlignmentFlag.AlignCenter)
         layout.addLayout(completed_actions)
         self.refresh()
 

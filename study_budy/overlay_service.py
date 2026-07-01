@@ -5,6 +5,7 @@ from __future__ import annotations
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
 from .checkin import CheckInService
+from .overlay_clients import CHECKIN_OVERLAY_CLIENT, TIMER_OVERLAY_CLIENT, record_overlay_heartbeat
 from .resources import resource_path
 from .storage import TaskRepository
 from .timer.service import TimerService
@@ -56,6 +57,13 @@ def create_overlay_app(repository: TaskRepository) -> Flask:
     @app.get("/api/timer")
     def timer_data():
         return jsonify(timer.snapshot())
+
+    @app.post("/api/overlay-clients/<client_id>/heartbeat")
+    def overlay_client_heartbeat(client_id: str):
+        if client_id not in {TIMER_OVERLAY_CLIENT, CHECKIN_OVERLAY_CLIENT}:
+            return jsonify({"error": "unknown overlay client"}), 404
+        record_overlay_heartbeat(client_id)
+        return jsonify({"status": "connected", "client": client_id})
 
     @app.get("/overlay")
     def overlay():
