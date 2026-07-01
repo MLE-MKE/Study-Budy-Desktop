@@ -171,6 +171,16 @@ def app_stylesheet() -> str:
         background: #32171b;
         border-color: #66313b;
     }}
+    /* ---- TASK WINDOW ACTION BUTTONS ---- */
+    /* This section keeps my longer Task window button labels from getting chopped off. */
+    QPushButton#TaskActionButton {{
+        width: auto;
+        min-width: 220px;
+        max-width: 100%;
+        padding: 10px 18px;
+        text-align: center;
+        box-sizing: border-box;
+    }}
     QLineEdit, QComboBox, QSpinBox, QTreeWidget, QTextBrowser {{
         background: {Theme.INPUT};
         border: 1px solid #343c48;

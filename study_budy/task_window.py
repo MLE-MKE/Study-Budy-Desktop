@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -44,23 +45,29 @@ class TaskWindow(QWidget):
         description.setWordWrap(True)
         layout.addWidget(description)
 
-        controls = QHBoxLayout()
+        controls = QVBoxLayout()
+        filter_controls = QHBoxLayout()
         self.filter = QComboBox()
         self.filter.addItems(["All", "Active", "Finished"])
         self.filter.currentTextChanged.connect(self.refresh)
-        controls.addWidget(QLabel("Filter:"))
-        controls.addWidget(self.filter)
-        controls.addStretch(1)
+        filter_controls.addWidget(QLabel("Filter:"))
+        filter_controls.addWidget(self.filter)
+        filter_controls.addStretch(1)
+        controls.addLayout(filter_controls)
+
+        selected_task_actions = QHBoxLayout()
+        selected_task_actions.setSpacing(10)
+        # ---- TASK WINDOW ACTION BUTTONS ----
+        # This section contains the task actions I still use.
         self.reopen_button = QPushButton("Reopen Task")
         self.reopen_button.clicked.connect(self.reopen_selected)
-        self.archive_button = QPushButton("Archive Completed Task")
-        self.archive_button.clicked.connect(self.archive_selected)
-        self.remove_viewer_button = QPushButton("Remove Viewer From Active List")
+        self.remove_viewer_button = QPushButton("Remove Viewer From List")
         self.remove_viewer_button.clicked.connect(self.remove_selected_participant)
-        self.clear_finished_button = QPushButton("Clear Finished Tasks")
-        self.clear_finished_button.clicked.connect(self.clear_finished)
-        for button in (self.reopen_button, self.archive_button, self.remove_viewer_button, self.clear_finished_button):
-            controls.addWidget(button)
+        for button in (self.reopen_button, self.remove_viewer_button):
+            self._style_task_action_button(button)
+            selected_task_actions.addWidget(button)
+        selected_task_actions.addStretch(1)
+        controls.addLayout(selected_task_actions)
         layout.addLayout(controls)
 
         self.tree = QTreeWidget()
@@ -70,7 +77,32 @@ class TaskWindow(QWidget):
         self.tree.setColumnWidth(1, 130)
         self.tree.itemChanged.connect(self.handle_item_changed)
         layout.addWidget(self.tree, 1)
+
+        # ---- COMPLETED TASK ACTION BUTTONS ----
+        # This section puts my completed-task controls underneath the task list,
+        # where they are easier to understand after reviewing the visible tasks.
+        completed_actions = QVBoxLayout()
+        completed_actions.setSpacing(10)
+        completed_actions.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # This button deletes my finished tasks from the list.
+        self.clear_finished_button = QPushButton("Delete Finished Tasks")
+        self.clear_finished_button.clicked.connect(self.clear_finished)
+        self.archive_completed_button = QPushButton("Archive Completed Tasks")
+        self.archive_completed_button.clicked.connect(self.archive_completed)
+        for button in (self.clear_finished_button, self.archive_completed_button):
+            self._style_task_action_button(button)
+            completed_actions.addWidget(button, 0, Qt.AlignmentFlag.AlignCenter)
+        layout.addLayout(completed_actions)
         self.refresh()
+
+    def _style_task_action_button(self, button: QPushButton) -> None:
+        # ---- TASK WINDOW ACTION BUTTONS ----
+        # This keeps my longer Task window labels from getting chopped off.
+        # peepeepoo poo, the buttons can finally breathe.
+        button.setObjectName("TaskActionButton")
+        button.setMinimumWidth(220)
+        button.setMaximumWidth(420)
+        button.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
 
     def refresh(self) -> None:
         self._loading = True
@@ -130,14 +162,6 @@ class TaskWindow(QWidget):
         self.refresh()
         self.on_change()
 
-    def archive_selected(self) -> None:
-        data = self.selected_data()
-        if "task_id" not in data:
-            return
-        self.repository.archive_task(data["task_id"])
-        self.refresh()
-        self.on_change()
-
     def remove_selected_participant(self) -> None:
         data = self.selected_data()
         if "participant_id" not in data:
@@ -149,6 +173,11 @@ class TaskWindow(QWidget):
             self.on_change()
 
     def clear_finished(self) -> None:
+        self.repository.archive_completed()
+        self.refresh()
+        self.on_change()
+
+    def archive_completed(self) -> None:
         self.repository.archive_completed()
         self.refresh()
         self.on_change()
