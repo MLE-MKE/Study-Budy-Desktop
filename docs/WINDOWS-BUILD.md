@@ -37,7 +37,31 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt -r requirements-build.txt
 ```
 
-## Build command
+## Simple build steps
+
+For a normal local build, you only need to:
+
+1. Open the repository folder.
+2. Double-click `build_windows.bat`.
+3. Wait for the build to finish.
+4. Open `dist\Study Budy`.
+5. Double-click `Study Budy.exe`.
+
+The entire `dist\Study Budy` folder must be distributed. Do not send only `Study Budy.exe`, because the app needs the support files beside it.
+
+To create a tester ZIP, double-click:
+
+```text
+create_portable_zip.bat
+```
+
+It creates:
+
+```text
+release\Study-Budy-Windows-Portable.zip
+```
+
+## Advanced build command
 
 For the easiest build, double-click:
 

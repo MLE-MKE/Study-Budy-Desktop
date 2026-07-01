@@ -13,7 +13,7 @@ study_budy/main.py
 For PyInstaller, the launcher is:
 
 ```text
-packaging/pyinstaller_entry.py
+launch_study_budy.py
 ```
 
 The installed executable is named:
@@ -85,7 +85,19 @@ packaging/study_budy.spec
 The portable app is created at:
 
 ```text
-release\Study-Budy-Desktop-v0.1.0-Windows-Portable.zip
+dist\Study Budy\Study Budy.exe
+```
+
+To create a ZIP for testers, double-click:
+
+```text
+create_portable_zip.bat
+```
+
+The ZIP is created at:
+
+```text
+release\Study-Budy-Windows-Portable.zip
 ```
 
 ## Create the installer
