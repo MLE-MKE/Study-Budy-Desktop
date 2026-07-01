@@ -48,10 +48,17 @@ class TaskWindow(QWidget):
         controls = QVBoxLayout()
         filter_controls = QHBoxLayout()
         self.filter = QComboBox()
-        self.filter.addItems(["All", "Active", "Finished"])
+        # ---- TASK FILTER OPTIONS ----
+        # These options let me view all, active, completed, or archived tasks.
+        self.filter.addItems(["All", "Active", "Completed", "Archived"])
+        # ---- TASK FILTER REFRESH ----
+        # This section refreshes my task list whenever I choose a different filter.
         self.filter.currentTextChanged.connect(self.refresh)
+        self.filter_summary = QLabel()
+        self.filter_summary.setObjectName("SmallNote")
         filter_controls.addWidget(QLabel("Filter:"))
         filter_controls.addWidget(self.filter)
+        filter_controls.addWidget(self.filter_summary)
         filter_controls.addStretch(1)
         controls.addLayout(filter_controls)
 
@@ -77,6 +84,11 @@ class TaskWindow(QWidget):
         self.tree.setColumnWidth(1, 130)
         self.tree.itemChanged.connect(self.handle_item_changed)
         layout.addWidget(self.tree, 1)
+        self.empty_state = QLabel("")
+        self.empty_state.setObjectName("Muted")
+        self.empty_state.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_state.hide()
+        layout.addWidget(self.empty_state)
 
         # ---- COMPLETED TASK ACTION BUTTONS ----
         # These buttons let me delete or archive my completed tasks.
@@ -108,14 +120,20 @@ class TaskWindow(QWidget):
         self._loading = True
         mode = self.filter.currentText()
         self.tree.clear()
-        for person in self.repository.task_snapshot(include_completed=True):
+        visible_count = 0
+        for person in self.repository.task_snapshot(include_completed=True, include_archived=True):
             tasks = person["tasks"]
+            # ---- ARCHIVED TASK FILTER ----
+            # This section shows only tasks that I previously archived.
             if mode == "Active":
-                tasks = [task for task in tasks if not task["is_complete"]]
-            elif mode == "Finished":
-                tasks = [task for task in tasks if task["is_complete"]]
+                tasks = [task for task in tasks if not task["is_complete"] and not task.get("archived_at")]
+            elif mode == "Completed":
+                tasks = [task for task in tasks if task["is_complete"] and not task.get("archived_at")]
+            elif mode == "Archived":
+                tasks = [task for task in tasks if task.get("archived_at")]
             if not tasks:
                 continue
+            visible_count += len(tasks)
             parent = QTreeWidgetItem(
                 [
                     person["display_name"],
@@ -127,16 +145,25 @@ class TaskWindow(QWidget):
             parent.setData(0, Qt.ItemDataRole.UserRole, {"participant_id": person["id"]})
             self.tree.addTopLevelItem(parent)
             for task in tasks:
-                state = "Finished" if task["is_complete"] else "Active"
+                archived = bool(task.get("archived_at"))
+                state = "Archived" if archived else ("Completed" if task["is_complete"] else "Active")
                 item = QTreeWidgetItem([task["text"], state, task["created_at"][:16], (task["completed_at"] or "")[:16]])
-                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                item.setCheckState(0, Qt.CheckState.Checked if task["is_complete"] else Qt.CheckState.Unchecked)
-                item.setData(0, Qt.ItemDataRole.UserRole, {"task_id": task["id"], "complete": task["is_complete"]})
-                if task["is_complete"]:
+                if not archived:
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                    item.setCheckState(0, Qt.CheckState.Checked if task["is_complete"] else Qt.CheckState.Unchecked)
+                item.setData(
+                    0,
+                    Qt.ItemDataRole.UserRole,
+                    {"task_id": task["id"], "complete": task["is_complete"], "archived": archived},
+                )
+                if task["is_complete"] or archived:
                     item.setForeground(0, Qt.GlobalColor.gray)
                     item.setForeground(1, Qt.GlobalColor.gray)
                 parent.addChild(item)
             parent.setExpanded(True)
+        self.filter_summary.setText(f"{visible_count} {mode} {'Task' if visible_count == 1 else 'Tasks'}")
+        self.empty_state.setText("No archived tasks found." if mode == "Archived" else "No tasks found.")
+        self.empty_state.setVisible(visible_count == 0)
         self._loading = False
 
     def handle_item_changed(self, item: QTreeWidgetItem, column: int) -> None:
@@ -144,7 +171,7 @@ class TaskWindow(QWidget):
             return
         data = item.data(0, Qt.ItemDataRole.UserRole) or {}
         task_id = data.get("task_id")
-        if not task_id:
+        if not task_id or data.get("archived"):
             return
         self.repository.set_task_complete(task_id, item.checkState(0) == Qt.CheckState.Checked)
         self.refresh()
@@ -156,7 +183,7 @@ class TaskWindow(QWidget):
 
     def reopen_selected(self) -> None:
         data = self.selected_data()
-        if "task_id" not in data:
+        if "task_id" not in data or data.get("archived"):
             return
         self.repository.set_task_complete(data["task_id"], False)
         self.refresh()
