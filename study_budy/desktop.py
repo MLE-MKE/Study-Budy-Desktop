@@ -37,7 +37,7 @@ from .server import OverlayServer, OverlayServerError, choose_available_port
 from .sidebar import Sidebar
 from .storage import TaskRepository, ValidationError
 from .task_window import TaskWindow
-from .theme import Theme, app_stylesheet
+from .theme import APPLICATION_THEME_KEY, Theme, app_stylesheet, normalize_application_theme
 from .timer_view import TimerView
 
 LOG = logging.getLogger(__name__)
@@ -118,6 +118,7 @@ class StudyBudyWindow(QMainWindow):
             "appearance": lambda: self.go_to_page(3),
             "help": lambda: self.go_to_page(6),
             "appearance_saved": self.appearance_saved,
+            "theme_changed": self.apply_application_theme,
         }
         self.dashboard = DashboardView(self.repository, self.overlay_server, callbacks)
         self.connections = ConnectionsView(self.repository, self.refresh_all)
@@ -178,7 +179,7 @@ class StudyBudyWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFixedWidth(Theme.RIGHT_PANEL_WIDTH)
-        self.full_appearance_panel = AppearancePanel(self.repository, self.appearance_saved)
+        self.full_appearance_panel = AppearancePanel(self.repository, self.appearance_saved, self.apply_application_theme)
         scroll.setWidget(self.full_appearance_panel)
         root.addWidget(scroll)
         return page
@@ -193,6 +194,9 @@ class StudyBudyWindow(QMainWindow):
         browser = QTextBrowser()
         browser.setHtml(
             """
+            <h2>Study Budy Help</h2>
+            <p>For step-by-step tutorials, setup instructions, and feature demonstrations, visit the KillerQueen55 YouTube channel.</p>
+            <p>For live demonstrations, development updates, and community support, follow Killer Queen on Twitch at killer_queen55.</p>
             <h2>First-run setup</h2>
             <ol>
               <li>Open Connections and enable Preview Mode or prepare Twitch OAuth.</li>
@@ -214,6 +218,17 @@ class StudyBudyWindow(QMainWindow):
             """
         )
         layout.addWidget(browser, 1)
+        # ---- HELP AND TUTORIAL LINKS ----
+        # This section directs users to my tutorials and live support channels.
+        links = QHBoxLayout()
+        self.youtube_button = QPushButton("Open YouTube Tutorials")
+        self.youtube_button.clicked.connect(self.open_youtube_tutorials)
+        self.twitch_button = QPushButton("Visit Twitch Channel")
+        self.twitch_button.clicked.connect(self.open_twitch_channel)
+        links.addWidget(self.youtube_button)
+        links.addWidget(self.twitch_button)
+        links.addStretch(1)
+        layout.addLayout(links)
         return page
 
     def handle_sidebar_navigation(self, index: int) -> None:
@@ -234,6 +249,16 @@ class StudyBudyWindow(QMainWindow):
         self.full_appearance_panel.load()
         live = self.overlay_server.running
         self.sidebar.set_system_status("Operational" if live else "Offline", live)
+
+    def apply_application_theme(self, theme_name: str | None = None) -> None:
+        # ---- APPLY APPLICATION THEME ----
+        # This section updates my open windows and controls with the selected colors.
+        selected = Theme.apply(normalize_application_theme(theme_name or self.repository.get_setting(APPLICATION_THEME_KEY, "Dark")))
+        self.repository.set_setting(APPLICATION_THEME_KEY, selected)
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(app_stylesheet())
+        self.refresh_all()
 
     def start_overlay(self) -> None:
         try:
@@ -312,6 +337,16 @@ class StudyBudyWindow(QMainWindow):
     def open_logs_folder(self) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(prepare_user_data_dir() / "logs")))
 
+    def open_external_link(self, url: str) -> None:
+        if not QDesktopServices.openUrl(QUrl(url)):
+            self.error("Study Budy could not open that link in your default browser.")
+
+    def open_youtube_tutorials(self) -> None:
+        self.open_external_link("https://www.youtube.com/@KillerQueen55")
+
+    def open_twitch_channel(self) -> None:
+        self.open_external_link("https://www.twitch.tv/killer_queen55")
+
     def reset_window(self) -> None:
         self.resize(Theme.DEFAULT_WINDOW_WIDTH, Theme.DEFAULT_WINDOW_HEIGHT)
         self.center_window()
@@ -357,6 +392,9 @@ def run_desktop(preview: bool = False) -> int:
     if preview:
         seed_preview_data(repository)
     server = OverlayServer(repository, port=repository.get_setting("overlay_port", 5155))
+    # ---- SAVED APPLICATION THEME ----
+    # This section remembers which application theme I selected.
+    Theme.apply(repository.get_setting(APPLICATION_THEME_KEY, "Dark"))
     app = QApplication([])
     app.setApplicationName("Study Budy")
     app.setWindowIcon(QIcon(str(LOGO_PATH)))

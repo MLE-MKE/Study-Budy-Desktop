@@ -149,7 +149,11 @@ class DashboardView(QWidget):
     def _build_right(self) -> None:
         self.preview = OverlayPreview(self.repository, compact=True)
         self.right_column.addWidget(self.preview, 1)
-        self.appearance = AppearancePanel(self.repository, self.callbacks["appearance_saved"])
+        self.appearance = AppearancePanel(
+            self.repository,
+            self.callbacks["appearance_saved"],
+            self.callbacks.get("theme_changed"),
+        )
         self.right_column.addWidget(self.appearance)
 
     def _obs_steps_card(self) -> QFrame:

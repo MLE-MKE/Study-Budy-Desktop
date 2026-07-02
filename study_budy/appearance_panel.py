@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import QSignalBlocker
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -19,14 +20,15 @@ from PySide6.QtWidgets import (
 from .icons import icon
 from .overlay_service import DEFAULT_APPEARANCE, LAYOUT_MODE_LIST, normalize_layout_mode
 from .storage import TaskRepository
-from .theme import Theme
+from .theme import APPLICATION_THEME_OPTIONS, APPLICATION_THEME_KEY, Theme, normalize_application_theme
 
 
 class AppearancePanel(QFrame):
-    def __init__(self, repository: TaskRepository, on_save) -> None:
+    def __init__(self, repository: TaskRepository, on_save, on_theme_change=None) -> None:
         super().__init__()
         self.repository = repository
         self.on_save = on_save
+        self.on_theme_change = on_theme_change or (lambda _theme: None)
         self.setObjectName("Card")
         self.setMinimumHeight(560)
         layout = QVBoxLayout(self)
@@ -42,6 +44,11 @@ class AppearancePanel(QFrame):
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self.task_list_title = QLineEdit()
+        self.application_theme = QComboBox()
+        # ---- APPLICATION THEME SETTINGS ----
+        # This section lets me change the colors used throughout the desktop application.
+        self.application_theme.addItems(APPLICATION_THEME_OPTIONS)
+        self.application_theme.currentTextChanged.connect(self.change_application_theme)
         self.title_icon = QComboBox()
         self.title_icon.addItem("Book", "book")
         self.title_icon.addItem("Box", "box")
@@ -68,6 +75,7 @@ class AppearancePanel(QFrame):
         self.show_finished = QCheckBox("Show Finished Tasks")
 
         for label, field in (
+            ("Application Theme", self.application_theme),
             ("Task List Title", self.task_list_title),
             ("Title Icon", self.title_icon),
             ("Font", self.font_name),
@@ -98,6 +106,9 @@ class AppearancePanel(QFrame):
     def load(self) -> None:
         appearance = {**DEFAULT_APPEARANCE, **self.repository.get_setting("appearance", {})}
         appearance["layout_mode"] = normalize_layout_mode(appearance.get("layout_mode"))
+        theme_name = normalize_application_theme(self.repository.get_setting(APPLICATION_THEME_KEY, Theme.CURRENT))
+        with QSignalBlocker(self.application_theme):
+            self.application_theme.setCurrentText(theme_name)
         self.task_list_title.setText(appearance["task_list_title"])
         icon_index = self.title_icon.findData(appearance["title_icon"])
         self.title_icon.setCurrentIndex(max(icon_index, 0))
@@ -131,6 +142,13 @@ class AppearancePanel(QFrame):
         )
         self.repository.set_setting("appearance", current)
         self.on_save()
+
+    def change_application_theme(self, theme_name: str) -> None:
+        # ---- SAVED APPLICATION THEME ----
+        # This section remembers which application theme I selected.
+        selected = normalize_application_theme(theme_name)
+        self.repository.set_setting(APPLICATION_THEME_KEY, selected)
+        self.on_theme_change(selected)
 
     def choose_image(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Upload overlay image", "", "Images (*.png *.jpg *.jpeg *.webp)")
