@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QSignalBlocker
 
+from .button_feedback import run_with_click_feedback
 from .icons import icon
 from .server import OverlayServer
 from .storage import TaskRepository
@@ -118,7 +119,10 @@ class TimerView(QWidget):
             button = QPushButton(label)
             if primary:
                 button.setObjectName("PrimaryButton")
-            button.clicked.connect(callback)
+            if label == "Copy URL":
+                button.clicked.connect(lambda checked=False, button=button, callback=callback: run_with_click_feedback(button, callback))
+            else:
+                button.clicked.connect(callback)
             row.addWidget(button)
         layout.addLayout(row)
         self.main.addWidget(card)

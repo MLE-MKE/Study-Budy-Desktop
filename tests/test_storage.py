@@ -28,8 +28,8 @@ def test_persists_task_order_and_participant_removal(repository):
 
 def test_settings_and_export_persist(repository, tmp_path):
     repository.add_task("luna", "Study")
-    repository.set_setting("appearance", {"layout_mode": "streamer_top"})
-    assert repository.get_setting("appearance")["layout_mode"] == "streamer_top"
+    repository.set_setting("appearance", {"layout_mode": "list"})
+    assert repository.get_setting("appearance")["layout_mode"] == "list"
     export = repository.export_json(tmp_path / "tasks.json")
     data = json.loads(export.read_text(encoding="utf-8"))
     assert data["participants"][0]["tasks"][0]["text"] == "Study"

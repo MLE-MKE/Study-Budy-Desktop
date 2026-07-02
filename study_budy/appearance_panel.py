@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from .icons import icon
-from .overlay_service import DEFAULT_APPEARANCE
+from .overlay_service import DEFAULT_APPEARANCE, LAYOUT_MODE_LIST, normalize_layout_mode
 from .storage import TaskRepository
 from .theme import Theme
 
@@ -58,8 +58,10 @@ class AppearancePanel(QFrame):
         self.opacity.setRange(0, 100)
         self.opacity.setSuffix(" %")
         self.layout_mode = QComboBox()
-        self.layout_mode.addItem("Cycle everyone", "cycle")
-        self.layout_mode.addItem("Streamer on top", "streamer_top")
+        # ---- LAYOUT MODE OPTIONS ----
+        # These options let me either cycle through everyone or show one scrolling task list.
+        self.layout_mode.addItem("Cycle Everyone", "cycle")
+        self.layout_mode.addItem("List", LAYOUT_MODE_LIST)
         self.corner_radius = QSpinBox()
         self.corner_radius.setRange(0, 48)
         self.corner_radius.setSuffix(" px")
@@ -95,6 +97,7 @@ class AppearancePanel(QFrame):
 
     def load(self) -> None:
         appearance = {**DEFAULT_APPEARANCE, **self.repository.get_setting("appearance", {})}
+        appearance["layout_mode"] = normalize_layout_mode(appearance.get("layout_mode"))
         self.task_list_title.setText(appearance["task_list_title"])
         icon_index = self.title_icon.findData(appearance["title_icon"])
         self.title_icon.setCurrentIndex(max(icon_index, 0))
@@ -111,6 +114,7 @@ class AppearancePanel(QFrame):
 
     def save(self) -> None:
         current = {**DEFAULT_APPEARANCE, **self.repository.get_setting("appearance", {})}
+        current["layout_mode"] = normalize_layout_mode(current.get("layout_mode"))
         current.update(
             {
                 "font_family": self.font_name.currentText(),

@@ -9,6 +9,7 @@ from .overlay_clients import CHECKIN_OVERLAY_CLIENT, TIMER_OVERLAY_CLIENT, recor
 from .resources import resource_path
 from .storage import TaskRepository
 from .timer.service import TimerService
+from .twitch.chat import MONITORED_CHANNEL_KEY, STREAMER_METADATA_KEY
 
 DEFAULT_APPEARANCE = {
     "task_list_title": "My Study Stream", "title_icon": "book",
@@ -18,6 +19,62 @@ DEFAULT_APPEARANCE = {
     "background_color": "#000000", "background_opacity": 60, "card_color": "#1f1830",
     "card_opacity": 85, "border_color": "#9f7aea", "border_radius": 12, "padding": 20,
 }
+
+LAYOUT_MODE_CYCLE = "cycle"
+LAYOUT_MODE_LIST = "list"
+OLD_STREAMER_TOP_LAYOUT_VALUES = {"streamer_top", "Streamer on Top", "Streamer on top", "streamer on top"}
+
+
+def normalize_layout_mode(value: object) -> str:
+    # ---- LAYOUT MODE SETTING MIGRATION ----
+    # This changes my old Streamer on Top setting into the new List layout.
+    if value in OLD_STREAMER_TOP_LAYOUT_VALUES:
+        return LAYOUT_MODE_LIST
+    if value == LAYOUT_MODE_LIST:
+        return LAYOUT_MODE_LIST
+    return LAYOUT_MODE_CYCLE
+
+
+def connected_streamer(repository: TaskRepository) -> dict[str, str]:
+    # ---- CONNECTED STREAMER LOOKUP ----
+    # This section uses the currently connected stream channel as my streamer.
+    streamer = repository.get_setting(STREAMER_METADATA_KEY, None) or {}
+    channel = repository.get_setting(MONITORED_CHANNEL_KEY, "") or streamer.get("login", "")
+    login = str(channel or streamer.get("login", "")).strip().lstrip("#").casefold()
+    display_name = str(streamer.get("display_name") or streamer.get("login") or login or "").strip()
+    user_id = str(streamer.get("user_id") or "").strip()
+    return {"login": login, "display_name": display_name, "user_id": user_id}
+
+
+def order_participants_for_list_layout(participants: list[dict], streamer: dict[str, str]) -> list[dict]:
+    # ---- LIST LAYOUT MODE ----
+    # This layout puts the connected streamer's to-do list at the top.
+    if not streamer.get("login") and not streamer.get("user_id"):
+        return participants
+    names = {streamer.get("login", "").casefold(), streamer.get("display_name", "").casefold()} - {""}
+    user_id = streamer.get("user_id", "")
+    streamer_matches, other_participants = [], []
+    for participant in participants:
+        display_name = str(participant.get("display_name", "")).casefold()
+        twitch_user_id = str(participant.get("twitch_user_id") or "")
+        is_match = bool(user_id and twitch_user_id == user_id) or display_name in names or participant.get("participant_type") == "streamer"
+        (streamer_matches if is_match else other_participants).append(participant)
+    if not streamer_matches:
+        return participants
+
+    streamer_section = {**streamer_matches[0]}
+    if streamer.get("display_name"):
+        streamer_section["display_name"] = streamer["display_name"]
+    streamer_section["participant_type"] = "streamer"
+    combined_tasks, seen_task_ids = [], set()
+    for participant in streamer_matches:
+        for task in participant.get("tasks", []):
+            if task["id"] in seen_task_ids:
+                continue
+            seen_task_ids.add(task["id"])
+            combined_tasks.append(task)
+    streamer_section["tasks"] = combined_tasks
+    return [streamer_section, *other_participants]
 
 
 def create_overlay_app(repository: TaskRepository) -> Flask:
@@ -41,6 +98,7 @@ def create_overlay_app(repository: TaskRepository) -> Flask:
     @app.get("/api/overlay")
     def overlay_data():
         appearance = {**DEFAULT_APPEARANCE, **repository.get_setting("appearance", {})}
+        appearance["layout_mode"] = normalize_layout_mode(appearance.get("layout_mode"))
         try:
             appearance["cycle_seconds"] = max(8, int(appearance.get("cycle_seconds") or 8))
         except (TypeError, ValueError):
@@ -48,7 +106,10 @@ def create_overlay_app(repository: TaskRepository) -> Flask:
         participants = repository.task_snapshot(include_completed=appearance["show_completed"])
         if appearance["hide_empty"]:
             participants = [item for item in participants if item["tasks"]]
-        return jsonify({"participants": participants, "appearance": appearance})
+        streamer = connected_streamer(repository)
+        if appearance["layout_mode"] == LAYOUT_MODE_LIST:
+            participants = order_participants_for_list_layout(participants, streamer)
+        return jsonify({"participants": participants, "appearance": appearance, "connected_streamer": streamer})
 
     @app.get("/api/checkin")
     def checkin_data():

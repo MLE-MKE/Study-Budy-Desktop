@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .button_feedback import run_with_click_feedback
 from .checkin import COLOR_THEMES, CheckInService, DEFAULT_CHECKIN_APPEARANCE
 from .server import OverlayServer
 from .storage import TaskRepository
@@ -125,7 +126,10 @@ class CheckInView(QWidget):
             button = QPushButton(label)
             if primary:
                 button.setObjectName("PrimaryButton")
-            button.clicked.connect(callback)
+            if label == "Copy URL":
+                button.clicked.connect(lambda checked=False, button=button, callback=callback: run_with_click_feedback(button, callback))
+            else:
+                button.clicked.connect(callback)
             buttons.addWidget(button, index // 3, index % 3)
         layout.addLayout(buttons)
         return card

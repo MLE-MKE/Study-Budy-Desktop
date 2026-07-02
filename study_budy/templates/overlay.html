@@ -9,11 +9,15 @@
       background: transparent;
       color: white;
       font-family: "Segoe UI", sans-serif;
+      overflow: hidden;
     }
     #overlay {
-      display: grid;
+      display: flex;
+      flex-direction: column;
       gap: 14px;
       width: min(560px, 100vw);
+      height: 100vh;
+      overflow: hidden;
     }
     .card {
       padding: var(--padding);
@@ -42,6 +46,27 @@
       text-decoration: line-through;
       opacity: .8;
     }
+    .list-viewport {
+      position: relative;
+      overflow: hidden;
+      min-height: 0;
+      flex: 1;
+    }
+    .list-content {
+      display: grid;
+      gap: 14px;
+      will-change: transform;
+    }
+    .streamer-label {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 7px;
+      border: 1px solid #ffd84f;
+      border-radius: 999px;
+      color: #ffd84f;
+      font-size: calc(var(--task-size) * .68);
+      vertical-align: middle;
+    }
   </style>
 </head>
 <body>
@@ -51,6 +76,9 @@ let index = 0;
 let lastCycleAt = 0;
 let lastCycleMode = '';
 let lastCycleCount = 0;
+let listScrollAnimation = null;
+let listScrollSignature = '';
+let lastDrawSignature = '';
 const root = document.getElementById('overlay');
 const safeText = value => document.createTextNode(String(value || ''));
 const cycleDelay = settings => Math.max(8, Number(settings.cycle_seconds || 8)) * 1000;
@@ -66,12 +94,18 @@ function titleCard(settings) {
   return article;
 }
 
-function card(participant) {
+function card(participant, isStreamer = false) {
   const article = document.createElement('article');
   article.className = 'card';
   const heading = document.createElement('h2');
   heading.className = 'person-title';
   heading.append(safeText(participant.display_name));
+  if (isStreamer) {
+    const badge = document.createElement('span');
+    badge.className = 'streamer-label';
+    badge.append(safeText('Streamer'));
+    heading.append(badge);
+  }
   article.append(heading);
   participant.tasks.forEach((task, taskIndex) => {
     const item = document.createElement('div');
@@ -96,24 +130,114 @@ function cycledParticipant(participants, settings, mode) {
   return participants[index % participants.length];
 }
 
+function stopListScroll() {
+  if (listScrollAnimation) cancelAnimationFrame(listScrollAnimation);
+  listScrollAnimation = null;
+  listScrollSignature = '';
+}
+
+function listContentSignature(data) {
+  return JSON.stringify({
+    layout_mode: data.appearance.layout_mode,
+    participants: data.participants.map(participant => ({
+      id: participant.id,
+      display_name: participant.display_name,
+      participant_type: participant.participant_type,
+      tasks: participant.tasks.map(task => [task.id, task.text, task.is_complete]),
+    })),
+    connected_streamer: data.connected_streamer,
+    appearance: {
+      task_list_title: data.appearance.task_list_title,
+      title_icon: data.appearance.title_icon,
+      show_completed: data.appearance.show_completed,
+      font_family: data.appearance.font_family,
+      participant_font_size: data.appearance.participant_font_size,
+      task_font_size: data.appearance.task_font_size,
+      text_color: data.appearance.text_color,
+      card_color: data.appearance.card_color,
+      card_opacity: data.appearance.card_opacity,
+      border_radius: data.appearance.border_radius,
+    },
+  });
+}
+
+function startAutomaticListScrolling(viewport, content, signature) {
+  // ---- AUTOMATIC LIST SCROLLING ----
+  // This section scrolls through my users and task items when they do not all fit.
+  // peepeepoo poo, the task parade now scrolls instead of falling off the frame
+  const maxScroll = Math.max(0, content.scrollHeight - viewport.clientHeight);
+  if (maxScroll <= 2) {
+    stopListScroll();
+    content.style.transform = 'translateY(0)';
+    return;
+  }
+  if (listScrollSignature === signature && listScrollAnimation) return;
+  stopListScroll();
+  listScrollSignature = signature;
+  const topPauseMs = 2500;
+  const bottomPauseMs = 2500;
+  const pixelsPerSecond = 24;
+  const scrollDurationMs = (maxScroll / pixelsPerSecond) * 1000;
+  const totalDurationMs = topPauseMs + scrollDurationMs + bottomPauseMs + scrollDurationMs;
+
+  const step = timestamp => {
+    const elapsed = timestamp % totalDurationMs;
+    let y = 0;
+    if (elapsed < topPauseMs) {
+      y = 0;
+    } else if (elapsed < topPauseMs + scrollDurationMs) {
+      y = ((elapsed - topPauseMs) / scrollDurationMs) * maxScroll;
+    } else if (elapsed < topPauseMs + scrollDurationMs + bottomPauseMs) {
+      y = maxScroll;
+    } else {
+      y = maxScroll - ((elapsed - topPauseMs - scrollDurationMs - bottomPauseMs) / scrollDurationMs) * maxScroll;
+    }
+    content.style.transform = `translateY(${-Math.round(y)}px)`;
+    listScrollAnimation = requestAnimationFrame(step);
+  };
+  listScrollAnimation = requestAnimationFrame(step);
+}
+
+function drawListLayout(data, signature) {
+  // ---- LIST LAYOUT MODE ----
+  // This layout puts the connected streamer's to-do list at the top.
+  root.append(titleCard(data.appearance));
+  const viewport = document.createElement('section');
+  viewport.className = 'list-viewport';
+  const content = document.createElement('div');
+  content.className = 'list-content';
+  data.participants.forEach((participant, participantIndex) => {
+    content.append(card(participant, participantIndex === 0 && participant.participant_type === 'streamer'));
+  });
+  viewport.append(content);
+  root.append(viewport);
+  requestAnimationFrame(() => startAutomaticListScrolling(viewport, content, signature));
+}
+
 function draw(data) {
   const settings = data.appearance;
+  const signature = listContentSignature(data);
+  if (settings.layout_mode === 'list' && signature === lastDrawSignature && listScrollAnimation) return;
   root.style.cssText = `--padding:${settings.padding}px;--border:${settings.border_color};--radius:${settings.border_radius}px;--card:${settings.card_color}${Math.round(settings.card_opacity * 2.55).toString(16).padStart(2, '0')};--name-size:${settings.participant_font_size}px;--task-size:${settings.task_font_size}px;--done:${settings.completed_text_color};font-family:${settings.font_family},sans-serif;color:${settings.text_color};`;
   root.replaceChildren();
-  root.append(titleCard(settings));
+  if (settings.layout_mode === 'list') {
+    lastDrawSignature = signature;
+  } else {
+    lastDrawSignature = '';
+    stopListScroll();
+    root.append(titleCard(settings));
+  }
   const participants = data.participants;
   if (!participants.length) {
+    stopListScroll();
     const message = document.createElement('div');
     message.className = 'card';
     message.append(safeText('Waiting for tasks…'));
     root.append(message);
     return;
   }
-  if (settings.layout_mode === 'streamer_top') {
-    const streamer = participants.find(participant => participant.participant_type === 'streamer');
-    const viewers = participants.filter(participant => participant !== streamer);
-    if (streamer) root.append(card(streamer));
-    if (viewers.length) root.append(card(cycledParticipant(viewers, settings, 'streamer_top')));
+  if (settings.layout_mode === 'list') {
+    drawListLayout(data, signature);
   } else {
     root.append(card(cycledParticipant(participants, settings, 'cycle')));
   }
@@ -128,6 +252,10 @@ async function refresh() {
 }
 refresh();
 setInterval(refresh, 1000);
+window.addEventListener('resize', () => {
+  lastDrawSignature = '';
+  refresh();
+});
 </script>
 </body>
 </html>

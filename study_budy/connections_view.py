@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .button_feedback import run_with_click_feedback
 from .icons import icon
 from .storage import TaskRepository
 from .theme import Theme
@@ -292,7 +293,10 @@ class ConnectionsView(QWidget):
             button = QPushButton(label)
             if primary:
                 button.setObjectName("PrimaryButton")
-            button.clicked.connect(callback)
+            if label in {f"Connect {ROLE_LABELS[role]} Account", f"Reconnect {ROLE_LABELS[role]} Account"}:
+                button.clicked.connect(lambda checked=False, button=button, callback=callback: run_with_click_feedback(button, callback))
+            else:
+                button.clicked.connect(callback)
             buttons.addWidget(button)
             setattr(self, f"{role}_{label.lower().replace(' ', '_')}", button)
         box.addLayout(buttons)

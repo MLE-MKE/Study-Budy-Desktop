@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from .appearance_panel import AppearancePanel
+from .button_feedback import run_with_click_feedback
 from .icons import LOGO_PATH, icon
 from .overlay_clients import CHECKIN_OVERLAY_CLIENT, TIMER_OVERLAY_CLIENT, is_overlay_client_connected
 from .overlay_preview import OverlayPreview
@@ -119,7 +120,10 @@ class DashboardView(QWidget):
             button.setIcon(icon(icon_name))
             if primary:
                 button.setObjectName("PrimaryButton")
-            button.clicked.connect(callback)
+            if label == "Copy URL":
+                button.clicked.connect(lambda checked=False, button=button, callback=callback: run_with_click_feedback(button, callback))
+            else:
+                button.clicked.connect(callback)
             self.url_buttons.append(button)
         url_box.addLayout(self.url_grid)
         self.main.addWidget(url_card)
